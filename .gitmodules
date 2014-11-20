@@ -1,0 +1,9 @@
+[submodule "ppcg"]
+	path = ppcg
+	url = https://github.com/Meinersbur/ppcg.git
+[submodule "pencil"]
+	path = pencil
+	url = https://github.com/Meinersbur/pencil
+[submodule "pencil-util"]
+	path = pencil-util
+	url = https://github.com/Meinersbur/pencil-util.git
