@@ -33,10 +33,14 @@ cc_flags = []
 cc_verbose = 0
 
 
-def invoke(cmd, *args):
+
+def print_command(cmd, *args):
 	if print_commands:
 		shortcmd = os.path.basename(cmd) if print_commands_baseonly else shlex.quote(cmd)
 		print('$ ' + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]),file=sys.stderr)
+
+def invoke(cmd, *args):
+	print_command(cmd, *args)
 	subprocess.check_call([cmd] + list(args))
 
 
@@ -114,6 +118,20 @@ def print_versions():
 			pass
 
 
+def locate(filename, paths, default=None):
+	for path in paths:
+		if not path:
+			continue
+		filepath = os.path.join(path,filename)
+		if os.path.isfile(filepath):
+			print('FOUND: ',filepath)
+			return os.path.abspath(filepath)
+		else:
+			print('TEST:  ',filepath)
+	return default
+
+
+
 def main():
 	CC = os.environ.get('CC')
 	CPP = os.environ.get('CPP')
@@ -126,6 +144,7 @@ def main():
 	parser.add_argument('--version', action='store_true', help="Print versions of involved programs")
 	parser.add_argument('--show-commands', action='store_true', help="Print executed commands")
 	parser.add_argument('--show-commands-baseonly', action='store_true', help="Do not print full command path")
+	parser.add_argument('--noselfupdate', dest='selfupdate', default=True, action='store_false', help="Do not try to update yourself")
 	
 	parser.add_argument('--pencil-cpp-path', metavar='CC', default=CPP or 'cpp')
 	
@@ -140,13 +159,21 @@ def main():
 	parser.add_argument('--pencil-runtime', action='store_true', help="Use the PENCIL OpenCL runtime")
 
 	known, unknown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
-	print(known)
-
+	#print(known)
 
 	global print_commands,print_commands_baseonly
 	print_commands = (known.verbose > 0) or known.show_commands or known.show_commands_baseonly
 	print_commands_baseonly = known.show_commands_baseonly
-	
+
+	scriptdir =  os.path.dirname(sys.argv[0])
+	if known.selfupdate and (os.path.isfile(os.path.join(scriptdir, 'Makefile')) or os.path.isfile(os.path.join(scriptdir, 'makefile'))):
+		invoke('make','pencilcc.py') #TODO: chdir scriptdir
+		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
+		print_command(*cmdline)
+		rtn = subprocess.call(cmdline)
+		exit(rtn)
+
+
 	global cpp_prog,cpp_flags,cpp_verbose
 	cpp_prog = known.pencil_cpp_path or CPP or cpp_prog
 	cpp_flags = CPPFLAGS
@@ -171,8 +198,6 @@ def main():
 	use_optimizer = known.pencil_opt or known.pencil_opt_path
 	use_runtime = known.pencil_runtime
 	
-	ocl_utilities_h_path = os.path.combine(os.path.abspath(ppcg_prog), '..', 'ocl_utilities.h')
-	
 	if known.version:
 		print_versions()
 		exit(0)
@@ -187,13 +212,52 @@ def main():
 		else:
 			ccargs.append(arg)
 		
-	print("Input files:", files)
-	print("No special handling for (passed to cc):", ccargs)
+	#print("Input files:", files)
+	#print("No special handling for (passed to cc):", ccargs)
 	
 	if not files:
 		print("No input files")
 		exit(4)
+		
 	
+	# Interfacing with autoconf
+	with_ppcg='''@with_ppcg@'''
+	prefix='''@prefix@'''
+	abs_builddir='''@abs_builddir@'''
+	abs_srcdir='''@abs_srcdir@'''
+	includedir='''@includedir@'''.replace('''${prefix}''', prefix)
+
+	if with_ppcg=='bundled':
+		PPCG_BUILDDIR=os.path.join(abs_builddir,'ppcg')
+		PPCG_SRCDIR=os.path.join(abs_srcdir,'ppcg')
+	elif with_ppcg=='build':
+		PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
+		PPCG_SRCDIR='''@PPCG_SRCDIR@'''
+
+
+	# Determine configuration for compiling with ppcg
+	ocl_utilities_h = None
+	ocl_utilities_c = None
+	if with_ppcg=='bundled' or with_ppcg=='build':
+		ocl_utilities_c = locate('ocl_utilities.c', paths=[PPCG_SRCDIR])
+		ocl_utilities_h = locate('ocl_utilities.h', paths=[PPCG_SRCDIR, includedir])
+	elif with_ppcg=='system':
+		pass
+	else:
+		pass
+	# if not found, assume it is in the system path and the compiler will find it
+	if not ocl_utilities_h:
+		ocl_utilities_h = 'ocl_utilities.h'
+	# TODO: There should be some installable ocl_utilities library to get the runtime functions from
+	
+	ocl_utilities_cflags = []
+	ocl_utilities_cppflags = []
+	if os.path.dirname(ocl_utilities_h):
+		ocl_utilities_cppflags += ['-I', os.path.dirname(ocl_utilities_h)]
+	if ocl_utilities_c:
+		ocl_utilities_cflags += [ocl_utilities_c]
+	
+
 	#with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
 	tmpdir = tempfile.mkdtemp(prefix='pencil.')
 	while True:
@@ -218,13 +282,15 @@ def main():
 				ppcgargs = ['--target=opencl']
 				if ispencil:
 					ppcgargs += ['--pet-autodetect']
+				ppcgargs += ['-I', os.path.dirname(ocl_utilities_h)]
+				ppcgargs += ocl_utilities_cppflags
 				ppcgargs += [file, '-o', outfile]
 				invoke_ppcg(*ppcgargs)
 				file = outfile
 				
 			outfiles.append(file)
 
-		invoke_cc(*(['-std=c99'] + ccargs + outfiles))
+		invoke_cc(*(['-std=c99'] + ccargs + ocl_utilities_cppflags + ocl_utilities_cppflags + outfiles))
 		break
 
 
