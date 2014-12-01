@@ -48,6 +48,9 @@ AC_SUBST(PPCG_BUILDDIR)
 AC_SUBST(PPCG_SRCDIR)
 AC_SUBST(with_ppcg)
 AX_SUBMODULE(ppcg,build|bundled|system,bundled)
+AX_SUBMODULE_FWD(isl,build|bundled|system,bundled)
+AX_SUBMODULE_FWD(pet,build|bundled|system,bundled)
+AX_SUBMODULE_FWD(clang,build|system,system)
 case "$with_ppcg" in
 no)
 	;;
@@ -65,7 +68,7 @@ esac
 
 
 
-#AX_SUBMODULE(pencil,build|bundled|system|no,bundled)
+AX_SUBMODULE(pencil,build|bundled|system|no,bundled)
 case "$with_pencil" in
 no)
 	;;
@@ -74,16 +77,11 @@ bundled)
 build)
 	;;
 system)
-	PKG_CHECK_MODULES([PPCG], [ppcg])
 	;;
 esac
 
 
-#AX_SUBMODULE_FWD(isl,build|bundled|system,bundled)
 
-#AX_SUBMODULE_FWD(pet,build|bundled|system,bundled)
-
-#AX_SUBMODULE_FWD(clang,build|system,system)
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
@@ -94,9 +92,9 @@ if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
 fi
 
-#if test x"$with_pencil" = xbundled; then
-#	AC_CONFIG_SUBDIRS(pencil)
-#fi
+if test x"$with_pencil" = xbundled; then
+	AC_CONFIG_SUBDIRS(pencil)
+fi
 
 #AC_CONFIG_COMMANDS_POST([
 #	dnl pass on arguments to subdir configures, but don't

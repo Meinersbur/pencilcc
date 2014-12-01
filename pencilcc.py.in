@@ -86,7 +86,7 @@ def invoke_cc(*cmdline):
 
 
 def print_versions():
-	print("PENCIL driver version 0.1")
+	print("PENCIL driver ", '''@GIT_HEAD_ID@''')
 	print()
 	
 	if cpp_prog:
