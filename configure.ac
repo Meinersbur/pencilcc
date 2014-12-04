@@ -6,18 +6,19 @@ AC_INIT([pencil-driver], [0.0], [carp-pencil@imperial.ac.uk])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Automake
-AC_CONFIG_AUX_DIR([build-aux]) 
+AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AM_MAINTAINER_MODE([enable])
 
 #AC_CONFIG_SRCDIR([pencil-util/runtime/pencil_runtime.h])
 #AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
-AC_PROG_CC
+#AC_PROG_CC
 AC_PROG_CPP
-AC_PROG_LN_S
-AM_PROG_AR
-AC_PROG_LIBTOOL
+#AC_PROG_LN_S
+#AM_PROG_AR
+#AC_PROG_LIBTOOL
 PKG_PROG_PKG_CONFIG
 
 # Checks for header files.
@@ -44,6 +45,7 @@ AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
 
 
+
 AC_SUBST(PPCG_BUILDDIR)
 AC_SUBST(PPCG_SRCDIR)
 AC_SUBST(with_ppcg)
@@ -64,10 +66,13 @@ system)
 	PKG_CHECK_MODULES([PPCG], [ppcg])
 	;;
 esac
+AM_CONDITIONAL(BUNDLED_PPCG, test "x$with_ppcg" = xbundled)
 
 
 
-
+AC_SUBST(PPCG_BUILDDIR)
+AC_SUBST(PPCG_SRCDIR)
+AC_SUBST(with_pencil)
 AX_SUBMODULE(pencil,build|bundled|system|no,bundled)
 case "$with_pencil" in
 no)
@@ -75,11 +80,13 @@ no)
 bundled)
 	;;
 build)
+	PENCIL_BUILDDIR=`echo @abs_builddir@ | $with_ppcg_builddir/config.status --file=-`
+	PENCIL_SRCDIR=`echo @abs_srcdir@ | $with_ppcg_builddir/config.status --file=-`
 	;;
 system)
 	;;
 esac
-
+AM_CONDITIONAL(BUNDLED_PENCIL, test "x$with_pencil" = xbundled)
 
 
 

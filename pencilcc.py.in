@@ -133,11 +133,94 @@ def locate(filename, paths, default=None):
 
 
 def main():
+	# Interfacing with environment variables
 	CC = os.environ.get('CC')
 	CPP = os.environ.get('CPP')
-	
 	CFLAGS = shlex.split(os.environ.get('CFLAGS') or '')
 	CPPFLAGS = shlex.split(os.environ.get('CPPFLAGS') or '')
+	LFLAGS = shlex.split(os.environ.get('LFLAGS') or '')
+	
+	
+	# Interfacing with autoconf
+	with_ppcg='''@with_ppcg@'''
+	with_pencil='''@with_pencil@'''
+	prefix='''@prefix@'''
+	eprefix='''@eprefix@'''
+	abs_builddir='''@abs_builddir@'''
+	abs_srcdir='''@abs_srcdir@'''
+	includedir='''@includedir@'''.replace('''${prefix}''', prefix)
+	bindir='''@bindir@'''
+
+	pencilcc_build=os.path.join(abs_builddir,'pencilcc.py')
+	print(os.path.abspath(sys.argv[0]) )
+	print(os.path.abspath(pencilcc_build))
+	is_build=os.path.abspath(sys.argv[0]) == os.path.abspath(pencilcc_build)
+
+	ocl_utilities_cflags = []
+	ocl_utilities_cppflags = []
+	pencil_h_cppflags = []
+	
+	global ppcg_prog
+	if is_build:
+		# Script runs from build directory
+		if with_ppcg=='no':
+			print("No ppcg")
+			ppcg_prog=None
+		elif with_ppcg=='bundled' or with_ppcg=='build':
+			if with_ppcg=='bundled':
+				print("Bundled ppcg")
+				PPCG_BUILDDIR=os.path.join(abs_builddir,'ppcg')
+				PPCG_SRCDIR=os.path.join(abs_srcdir,'ppcg')
+			elif with_ppcg=='build':
+				print("Builddir ppcg")
+				PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
+				PPCG_SRCDIR='''@PPCG_SRCDIR@'''
+			ppcg_prog=os.path.join(PPCG_BUILDDIR,'ppcg')
+			#ocl_utilities_c = os.path.join(PPCG_SRCDIR, 'ocl_utilities.c')
+			#ocl_utilities_h = os.path.join(PPCG_SRCDIR, 'ocl_utilities.h')
+			ocl_utilities_cppflags += ['-I', PPCG_SRCDIR]
+		else: # System
+			print("System ppcg")
+			ppcg_prog='ppcg'
+		ocl_utilities_cflags += [os.path.join(PPCG_SRCDIR,'ocl_utilities.c')]
+		pencil_h_cppflags += ['-I', os.path.join(abs_srcdir,'pencil-util','include')]
+	else:
+		print("Installed ppcg")
+		# Script runs from installed location (or has never been configured); Ignore build path
+		if bindir:
+			ppcg_prog=os.path.join(bindir,'ppcg')
+		if includedir:
+			ocl_utilities_cppflags += ['-I', includedir]
+			pencil_h_cppflags += ['-I', includedir]
+			
+		#ocl_utilities_c = 'ocl_utilities.c' #TODO: Install (or make it a lib)
+		#ocl_utilities_h = locate('ocl_utilities.h', paths=[includedir], default='ocl_utilities.h')
+
+
+	global optimizer_prog
+	if is_build:
+		if with_pencil=='no':
+			print("No pencil-optimizer")
+			optimizer_prog=None
+		elif with_pencil=='bundled' or with_pencil=='build': 
+			if with_pencil=='bundled':
+				print("Bundled pencil-optimizer")
+				PENCIL_BUILDDIR=os.path.join(abs_builddir,'pencil')
+				PENCIL_SRCDIR=os.path.join(abs_srcdir,'pencil')
+			elif with_pencil=='build':
+				print("Builddir pencil-optimizer")
+				PENCIL_BUILDDIR='''@PENCIL_BUILDDIR@'''
+				PENCIL_SRCDIR='''@PENCIL_SRCDIR@'''
+			optimizer_prog=os.path.join(PENCIL_BUILDDIR,'pencil-optimizer')
+		else:
+			print("System pencil-optimizer")
+			optimizer_prog='pencil-optimizer'
+	else:
+		print("Installed pencil-optimizer")
+		if bindir:
+			optimizer_prog=os.path.join(bindir,'pencil-optimizer')
+
+	
 
 	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.")
 	parser.add_argument('-v', '--verbose', action='count', default=0)
@@ -148,18 +231,24 @@ def main():
 	
 	parser.add_argument('--pencil-cpp-path', metavar='CC', default=CPP or 'cpp')
 	
-	parser.add_argument('--pencil-opt', action='store_true', default=False, help="Use pencil-optimizer in toolchain")
-	parser.add_argument('--pencil-opt-path', metavar='OPTIMIZER', help="Path to optimizer")
+	if optimizer_prog is not None:
+		parser.add_argument('--pencil-opt', action='store_true', default=False, help="Use pencil-optimizer in toolchain")
+		parser.add_argument('--pencil-opt-path', metavar='OPTIMIZER', help="Path to optimizer (default: " + optimizer_prog + ")")
 	
-	parser.add_argument('--pencil-ppcg', action='store_true', default=False, help="Use ppcg in toolchain")
-	parser.add_argument('--pencil-ppcg-path', metavar='PPCG', help="Path to ppcg")
+	if ppcg_prog is not None:
+		parser.add_argument('--pencil-ppcg', action='store_true', default=False, help="Use ppcg in toolchain")
+		parser.add_argument('--pencil-ppcg-path', metavar='PPCG', help="Path to ppcg (default: " + ppcg_prog + ")")
 	
 	parser.add_argument('--pencil-cc-path', metavar='CC', default=CC or 'cc')
 
 	parser.add_argument('--pencil-runtime', action='store_true', help="Use the PENCIL OpenCL runtime")
 
+	# Compatibility arguments
+	parser.add_argument('-o', metavar='OUTPUT')
+
+
 	known, unknown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
-	#print(known)
+	print(known,unknown)
 
 	global print_commands,print_commands_baseonly
 	print_commands = (known.verbose > 0) or known.show_commands or known.show_commands_baseonly
@@ -173,7 +262,7 @@ def main():
 		rtn = subprocess.call(cmdline)
 		exit(rtn)
 
-
+ 
 	global cpp_prog,cpp_flags,cpp_verbose
 	cpp_prog = known.pencil_cpp_path or CPP or cpp_prog
 	cpp_flags = CPPFLAGS
@@ -183,7 +272,7 @@ def main():
 	optimizer_prog = known.pencil_opt_path or optimizer_prog
 	optimizer_verbose = max(optimizer_verbose, known.verbose-1)
 	
-	global ppcg_prog,ppcg_verbose 
+	global ppcg_verbose 
 	ppcg_prog = known.pencil_ppcg_path or ppcg_prog
 	if known.verbose > 1:
 		ppcg_verbose = known.verbose - 1
@@ -212,6 +301,9 @@ def main():
 		else:
 			ccargs.append(arg)
 		
+	if known.o is not None:
+		ccargs += ['-o', known.o]
+		
 	#print("Input files:", files)
 	#print("No special handling for (passed to cc):", ccargs)
 	
@@ -219,44 +311,7 @@ def main():
 		print("No input files")
 		exit(4)
 		
-	
-	# Interfacing with autoconf
-	with_ppcg='''@with_ppcg@'''
-	prefix='''@prefix@'''
-	abs_builddir='''@abs_builddir@'''
-	abs_srcdir='''@abs_srcdir@'''
-	includedir='''@includedir@'''.replace('''${prefix}''', prefix)
 
-	if with_ppcg=='bundled':
-		PPCG_BUILDDIR=os.path.join(abs_builddir,'ppcg')
-		PPCG_SRCDIR=os.path.join(abs_srcdir,'ppcg')
-	elif with_ppcg=='build':
-		PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
-		PPCG_SRCDIR='''@PPCG_SRCDIR@'''
-
-
-	# Determine configuration for compiling with ppcg
-	ocl_utilities_h = None
-	ocl_utilities_c = None
-	if with_ppcg=='bundled' or with_ppcg=='build':
-		ocl_utilities_c = locate('ocl_utilities.c', paths=[PPCG_SRCDIR])
-		ocl_utilities_h = locate('ocl_utilities.h', paths=[PPCG_SRCDIR, includedir])
-	elif with_ppcg=='system':
-		pass
-	else:
-		pass
-	# if not found, assume it is in the system path and the compiler will find it
-	if not ocl_utilities_h:
-		ocl_utilities_h = 'ocl_utilities.h'
-	# TODO: There should be some installable ocl_utilities library to get the runtime functions from
-	
-	ocl_utilities_cflags = []
-	ocl_utilities_cppflags = []
-	if os.path.dirname(ocl_utilities_h):
-		ocl_utilities_cppflags += ['-I', os.path.dirname(ocl_utilities_h)]
-	if ocl_utilities_c:
-		ocl_utilities_cflags += [ocl_utilities_c]
-	
 
 	#with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
 	tmpdir = tempfile.mkdtemp(prefix='pencil.')
@@ -269,36 +324,37 @@ def main():
 			file = infile
 			
 			if use_optimizer and ispencil:
-				cppfile = tempfile.mkstemp(prefix=rootname,postfix='.i',dir=tmpdir)
-				invoke_cpp('-P','-o', cppfile)
+				tmpsubdir = tempfile.mkdtemp(prefix='opt.',dir=tmpdir)
+				
+				cppfile = os.path.join(tmpsubdir, basename + '.i')
+				cppargs = []
+				cppargs += ['-D__PENCIL__=1']
+				cppargs += pencil_h_cppflags
+				cppargs += ['-P',file,'-o', cppfile]
+				invoke_cpp(*cppargs)
 
-				optfile = tempfile.mkstemp(prefix=rootname,postfix='.opt.c',dir=tmpdir)
-				invoke_opt(cppfile,'-o',optfile)
+				optfile =  os.path.join(tmpsubdir, rootname + '.opt.c')
+				invoke_optimizer(cppfile,'-o',optfile)
 				file = optfile
 			
 			if use_ppcg:
 				tmpsubdir = tempfile.mkdtemp(prefix='ppcg.',dir=tmpdir)
 				outfile = os.path.join(tmpsubdir, basename)
-				ppcgargs = ['--target=opencl']
+				ppcgargs = []
+				ppcgargs += ['-D__PENCIL__=2']
+				ppcgargs += ['--target=opencl']
 				if ispencil:
 					ppcgargs += ['--pet-autodetect']
-				ppcgargs += ['-I', os.path.dirname(ocl_utilities_h)]
-				ppcgargs += ocl_utilities_cppflags
+				ppcgargs += pencil_h_cppflags
 				ppcgargs += [file, '-o', outfile]
 				invoke_ppcg(*ppcgargs)
 				file = outfile
 				
 			outfiles.append(file)
 
-		invoke_cc(*(['-std=c99'] + ccargs + ocl_utilities_cppflags + ocl_utilities_cppflags + outfiles))
+		invoke_cc(*(['-std=c99', '-D__PENCIL__=3'] + ccargs + pencil_h_cppflags + ocl_utilities_cppflags + ocl_utilities_cflags + outfiles + ['-lm', '-lOpenCL']))
 		break
 
 
 if __name__ == '__main__':
 	main()
-
-
-
-
-
-
