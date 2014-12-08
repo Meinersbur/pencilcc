@@ -10,37 +10,18 @@ AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE([enable])
 
-#AC_CONFIG_SRCDIR([pencil-util/runtime/pencil_runtime.h])
-#AC_CONFIG_HEADERS([config.h])
-
 # Checks for programs.
-#AC_PROG_CC
 AC_PROG_CPP
-#AC_PROG_LN_S
-#AM_PROG_AR
-#AC_PROG_LIBTOOL
 PKG_PROG_PKG_CONFIG
-
-# Checks for header files.
-#AC_CHECK_HEADERS([stddef.h stdlib.h])
-
-# Checks for typedefs, structures, and compiler characteristics.
-#AC_CHECK_HEADER_STDBOOL
-#AC_C_INLINE
-#AC_TYPE_SIZE_T
-
-# Checks for library functions.
-#AC_FUNC_MALLOC
-#AC_CHECK_FUNCS([floor pow sqrt])
-
 
 AX_DETECT_GIT_HEAD
 AC_SUBST(GIT_HEAD_ID)
 #echo '#define GIT_HEAD_ID "'$GIT_HEAD_ID'"' > gitversion.h
 
 
-
-abs_builddir=`pwd` # ${ac_abs_builddir}
+dnl I there no official way yo get the build directory?
+abs_builddir=`pwd` # ${ac_abs_builddir} 
+abs_srcdir="${srcdir}"
 
 AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
@@ -51,7 +32,7 @@ AC_SUBST(abs_srcdir)
 AC_SUBST(PPCG_BUILDDIR)
 AC_SUBST(PPCG_SRCDIR)
 AC_SUBST(with_ppcg)
-AX_SUBMODULE(ppcg,build|bundled|system,bundled)
+AX_SUBMODULE(ppcg,no|build|bundled|system,bundled)
 AX_SUBMODULE_FWD(isl,build|bundled|system,bundled)
 AX_SUBMODULE_FWD(pet,build|bundled|system,bundled)
 AX_SUBMODULE_FWD(clang,build|system,system)
@@ -60,7 +41,7 @@ no)
 	;;
 bundled)
 	PPCG_BUILDDIR="${abs_builddir}/ppcg"
-	PPCG_SRCDIR="${srcdir}/ppcg"
+	PPCG_SRCDIR="${abs_srcdir}/ppcg"
 	oclutilities_path="${PPCG_SRCDIR}/ocl_utilities.c"
 	;;
 build)
@@ -79,13 +60,13 @@ AM_CONDITIONAL(BUNDLED_PPCG, test "x$with_ppcg" = xbundled)
 AC_SUBST(PENCIL_BUILDDIR)
 AC_SUBST(PENCIL_SRCDIR)
 AC_SUBST(with_pencil)
-AX_SUBMODULE(pencil,build|bundled|system|no,bundled)
+AX_SUBMODULE(pencil,no|build|bundled|system|no,bundled)
 case "$with_pencil" in
 no)
 	;;
 bundled)
 	PENCIL_BUILDDIR="${abs_builddir}/pencil"
-	PENCIL_SRCDIR="${srcdir}/pencil"
+	PENCIL_SRCDIR="${abs_srcdir}/pencil"
 	;;
 build)
 	PENCIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_builddir/config.status --file=-`
@@ -96,17 +77,34 @@ system)
 esac
 AM_CONDITIONAL(BUNDLED_PENCIL, test "x$with_pencil" = xbundled)
 
+dnl Prefer manually downloaded Scala+Antlr3 over autodetected
+if test -f "${abs_srcdir}/scala/lib/scala-compiler.jar"; then
+	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-compiler.jar"
+fi
+if test -f "${abs_srcdir}/scala/lib/scala-library.jar"; then
+	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-library.jar"
+fi
+if test -f "${abs_srcdir}/scala/lib/scala-reflect.jar"; then
+	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-reflect.jar"
+fi
+if test -f "${abs_srcdir}/antlr3/antlr3.jar"; then
+	CLASSPATH="${CLASSPATH}:${abs_srcdir}/antlr3/antlr3.jar"
+fi
+if test -f "${abs_srcdir}/antlr3/ant-antlr3.jar"; then
+	CLASSPATH="${CLASSPATH}:${abs_srcdir}/antlr3/ant-antlr3.jar"
+fi
+
 
 AC_SUBST(PENCIL_UTIL_BUILDDIR)
 AC_SUBST(PENCIL_UTIL_SRCDIR)
 AC_SUBST(with_pencil_util)
-AX_SUBMODULE(pencil-util,build|bundled|system|no,bundled)
+AX_SUBMODULE(pencil-util,no|build|bundled|system|no,bundled)
 case "$with_pencil_util" in
 no)
 	;;
 bundled)
 	PENCIL_UTIL_BUILDDIR="${abs_builddir}/pencil-util"
-	PENCIL_UTIL_SRCDIR="${srcdir}/pencil-util"
+	PENCIL_UTIL_SRCDIR="${abs_srcdir}/pencil-util"
 	;;
 build)
 	PENCIL_UTIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_util_builddir/config.status --file=-`
@@ -139,6 +137,6 @@ fi
 AC_CONFIG_COMMANDS_POST([
 	dnl pass on arguments to subdir configures, but don't
 	dnl add them to config.status
-	ac_configure_args="${ac_configure_args} --with-ocl_utilities=${oclutilities_path}"
+	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} --with-ocl_utilities=${oclutilities_path}" 
 ])
 AC_OUTPUT

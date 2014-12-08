@@ -21,3 +21,7 @@ Makefile.in
 
 # KDE Dolphin
 .directory
+
+# Manually installed dependencies
+/scala
+/antlr3
