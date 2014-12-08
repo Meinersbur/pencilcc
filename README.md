@@ -19,7 +19,7 @@ Requirements (that I know of)
   - Scala/scalac (Tested with version 2.10.4)
   - Apache Ant (Tested with version 1.9.4)
   - ANTLR3 (Tested with version 3.5.2)
-    - antlr3-task.jar
+    - antlr3-task
 - pencil headers and runtime (Bundled in pencil-util submodule)
   - C++11 compiler (Tested with g++ 4.9.1)
 - Python3 (Tested with version 3.4.2)
@@ -39,9 +39,9 @@ In theory:
 7) sudo make install
 
 
-In practice your distribution's Scala and ANTLR3 are probably not recent enough (e.g. Ubuntu 13.10 has only Scala 2.9.2 and ANTLR3 3.2 anf antlr3-task not available at all)
+In practice your distribution's Scala and ANTLR3 are probably not recent enough (e.g. Ubuntu 13.10 has only Scala 2.9.2 and ANTLR3 3.2 anf antlr3-task is not available at all)
 
-Installation instructions for Ubuntu 13.10 (Utopic Unicorn)
+Installation instructions for Ubuntu 13.10 (Utopic Unicorn):
 
 0) sudo apt-get install build-essential pkg-config libgmp-dev libclang-dev ant python3
 1) git clone https://github.com/Meinersbur/pencil-driver.git
@@ -51,3 +51,8 @@ Installation instructions for Ubuntu 13.10 (Utopic Unicorn)
 5) ./get-antlr3.sh
 6) ./autogen.sh
 7) ./configure
+8) make
+
+Be aware that this creates directories pencil-driver/scala and pencil-driver/antlr3 that are required even after make install.
+
+

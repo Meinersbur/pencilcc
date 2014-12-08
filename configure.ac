@@ -12,6 +12,7 @@ AM_MAINTAINER_MODE([enable])
 
 # Checks for programs.
 AC_PROG_CPP
+AC_PROG_LN_S
 PKG_PROG_PKG_CONFIG
 
 AX_DETECT_GIT_HEAD
@@ -26,6 +27,7 @@ abs_srcdir="${srcdir}"
 AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
 
+subconfigure_addargs=""
 
 
 
@@ -93,7 +95,9 @@ fi
 if test -f "${abs_srcdir}/antlr3/ant-antlr3.jar"; then
 	CLASSPATH="${CLASSPATH}:${abs_srcdir}/antlr3/ant-antlr3.jar"
 fi
-
+if test -f "${abs_srcdir}/scala/bin/scala"; then
+	subconfigure_addargs="${subconfigure_addargs} SCALA=${abs_srcdir}/scala/bin/scala"
+fi
 
 AC_SUBST(PENCIL_UTIL_BUILDDIR)
 AC_SUBST(PENCIL_UTIL_SRCDIR)
@@ -137,6 +141,6 @@ fi
 AC_CONFIG_COMMANDS_POST([
 	dnl pass on arguments to subdir configures, but don't
 	dnl add them to config.status
-	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} --with-ocl_utilities=${oclutilities_path}" 
+	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} ${subconfigure_addargs} --with-ocl_utilities=${oclutilities_path}" 
 ])
 AC_OUTPUT
