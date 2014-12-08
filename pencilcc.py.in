@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 # -*- coding: UTF-8 -*-
+# @configure_input@
 
 import argparse
 import os
@@ -7,30 +8,209 @@ import subprocess
 import shlex
 import tempfile
 import sys # sys.stderr
+import copy
+
+
+script = os.path.abspath(sys.argv[0])
+
+# Interface to autoconf
+prefix='''@prefix@'''
+exec_prefix='''@exec_prefix@'''
+
+with_ppcg='''@with_ppcg@'''
+with_pencil='''@with_pencil@'''
+with_pencil_util='''@with_pencil_util@'''
+
+abs_srcdir='''@abs_srcdir@'''
+abs_builddir='''@abs_builddir@'''
+includedir='''@includedir@'''.replace('''${prefix}''', prefix)
+bindir='''@bindir@'''.replace('''${exec_prefix}''', exec_prefix)
+libdir='''@libdir@'''.replace('''${exec_prefix}''', exec_prefix)
+datarootdir='''@datarootdir@'''.replace('''${prefix}''', prefix)
+
+PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
+PPCG_SRCDIR='''@PPCG_SRCDIR@'''
+
+PENCIL_BUILDDIR='''@PENCIL_BUILDDIR@'''
+PENCIL_SRCDIR='''@PENCIL_SRCDIR@'''
+
+PENCIL_UTIL_BUILDDIR='''@PENCIL_UTIL_BUILDDIR@'''
+PENCIL_UTIL_SRCDIR='''@PENCIL_UTIL_SRCDIR@'''
+
+
+# Return true if running from build directory
+#   True means accompanied files are looked for in the build directory
+#   False means files are searched in the prefix path
+def is_build():
+	return abs_builddir and (os.path.dirname(script) == os.path.abspath(abs_builddir))
+
+
+class Configuration:
+	props = ['cpp_prog',  'cpp_flags', 'cpp_verbose', 
+		  'cc_prog', 'cc_flags', 'cc_verbose',
+		  'use_optimizer', 'optimizer_prog', 'optimizer_flags', 'optimizer_verbose',
+		  'use_ppcg', 'ppcg_prog', 'ppcg_flags', 'ppcg_verbose',
+		  'pencil_h_cppflags',
+		  'ocl_utilities_cppflags', 'ocl_utilities_cflags', 
+		  'use_runtime', 'pencil_runtime_cppflags', 'pencil_runtime_lflags',
+		  'common_cppflags','common_cflags','common_lflags']
+
+	def __init__(self):
+		for prop in self.props:
+			setattr(self, prop, None)
+	
+	def merge(self, other):
+		for prop in self.props:
+			val = getattr(self, prop, None)
+			if val is None:
+				setattr(self, prop, getattr(other, prop))
+
+	# Platform introspection and default values
+	def system_config(self):
+		self.cpp_prog = os.environ.get('CPP') or 'cpp'
+		self.cpp_flags = [] # shlex.split(os.environ.get('CPPFLAGS') or '')
+		self.cpp_verbose = 0
+		
+		self.cc_prog = os.environ.get('CC') or 'cc'
+		self.cc_flags = [] # shlex.split(os.environ.get('CFLAGS') or '')
+		self.cc_verbose = 0
+		
+		self.use_optimizer = True
+		self.optimizer_prog = 'pencil-optimizer'
+		self.optimizer_flags = []
+		self.optimizer_verbose = 0
+		
+		self.use_ppcg = True
+		self.ppcg_prog = 'ppcg'
+		self.ppcg_flags = []
+		self.ppcg_verbose = 0
+		
+		self.pencil_h_cppflags = []
+		
+		self.ocl_utilities_cflags = []
+		self.ocl_utilities_cppflags = []
+
+		self.use_runtime = True
+		self.pencil_runtime_cppflags = []
+		self.pencil_runtime_lflags = ['-locl_pencil_opt']
+		
+		self.common_cppflags = []
+		self.common_cflags = []
+		self.common_lflags = []
+
+
+	def build_config(self):
+		if with_ppcg=='no':
+			self.use_ppcg = False
+			self.ppcg_prog = ''
+			self.ppcg_verbose = 0
+			self.ocl_utilities_cppflags = []
+			self.ocl_utilities_cflags = []
+		elif with_ppcg=='bundled' or with_ppcg=='build':
+			self.use_ppcg = True
+			self.ppcg_prog = os.path.join(PPCG_BUILDDIR,'ppcg')
+			self.ocl_utilities_cppflags =  ['-I', PPCG_SRCDIR]
+			self.ocl_utilities_cflags = [os.path.join(PPCG_SRCDIR,'ocl_utilities.c')]
+	
+		if with_pencil=='no':
+			self.use_optimizer = False
+			self.optimizer_prog = ''
+			self.optimzer_verbose = 0
+		elif with_pencil_util=='bundled' or with_pencil_util=='build':
+			self.use_optimizer = True
+			self.optimizer_prog = os.path.join(PENCIL_BUILDDIR,'pencil-optimizer')
+
+		if with_pencil_util=='no':
+			self.use_runtime = False
+			self.pencil_h_cppflags = []
+			self.pencil_runtime_cppflags = []
+			self.pencil_runtime_lflags = []
+		elif with_pencil_util=='bundled' or with_pencil_util=='build':
+			self.use_runtime = True
+			self.pencil_h_cppflags = ['-I', os.path.join(PENCIL_UTIL_SRCDIR, 'include')]
+			self.pencil_runtime_cppflags = ['-I', os.path.join(PENCIL_UTIL_SRCDIR, 'runtime')]
+			#self.pencil_runtime_lflags = ['-L' + PENCIL_UTIL_BUILDDIR, '-locl_pencil']
+			#self.pencil_runtime_lflags = [os.path.join(PENCIL_UTIL_BUILDDIR, 'libocl_pencil.la')]
+			self.pencil_runtime_lflags = ['-L' + os.path.join(PENCIL_UTIL_BUILDDIR, '.libs'), '-locl_pencil_opt']
+			#self.pencil_runtime_lflags = [os.path.join( PENCIL_UTIL_BUILDDIR, '.libs', 'libocl_pencil_opt.so')]
+	
+		self.common_cppflags = []
+		self.common_cflags = []
+		self.common_lflags = []
+	
+	
+	def install_config(self):
+		self.use_ppcg = with_pencil_util!='no'
+		self.ppcg_prog = os.path.join(bindir,'ppcg')
+		self.ppcg_flags = []
+		self.ppcg_verbose = 0
+		
+		self.use_optimizer = with_pencil!='no'
+		self.optimizer_prog =  os.path.join(bindir,'pencil-optimizer')
+		self.optimizer_flags = []
+		self.optimizer_verbose = 0
+
+		self.pencil_h_cppflags = []
+
+		self.ocl_utilities_cppflags = []
+		self.ocl_utilities_cflags =  os.path.join(datarootdir,'ocl_utilities.c') 
+
+
+		self.use_runtime = with_pencil_util!='no'
+		self.pencil_runtime_cppflags = []
+		self.pencil_runtime_lflags = ['-locl_pencil_opt']
+		
+		self.common_cppflags =  ['-I', includedir]
+		self.common_cflags = []
+		self.common_lflags = ['-L' + libdir]
+
+
+system_config = None
+def get_system_config():
+	global system_config
+	if not system_config:
+		system_config = Configuration()
+		system_config.system_config()
+	return system_config
+
+build_config = None
+def get_build_config():
+	global build_config
+	if not build_config:
+		build_config = Configuration()
+		build_config.build_config()
+	return build_config
+
+install_config = None
+def get_install_config():
+	global install_config
+	if not install_config:
+		install_config = Configuration()
+		install_config.install_config()
+	return install_config
+
+default_config = None
+def get_default_config():
+	global default_config
+	if not default_config:
+		if is_build():
+			default_config = copy.copy(get_build_config())
+		else:
+			default_config = copy.copy(get_install_config())
+		default_config.merge(get_system_config())
+	return default_config
+
+
+
+
 
 
 ### Global options
 
-# Print executed commands
 print_commands = False
+print_commands_baseonly = False
 
-# Paths to programs to call
-
-cpp_prog = 'cpp'
-cpp_flags = []
-cpp_verbose = 0
-
-optimizer_prog = 'pencil-optimizer'
-optimizer_flags = []
-optimizer_verbose = 0
-
-ppcg_prog = 'ppcg'
-ppcg_flags = []
-ppcg_verbose = 0
-
-cc_prog = 'cc'
-cc_flags = []
-cc_verbose = 0
+config = Configuration()
 
 
 
@@ -41,7 +221,9 @@ def print_command(cmd, *args):
 
 def invoke(cmd, *args):
 	print_command(cmd, *args)
-	subprocess.check_call([cmd] + list(args))
+	rtncode = subprocess.call([cmd] + list(args))
+	if rtncode!=0:
+		exit(rtncode)
 
 
 def verbosity(lvl):
@@ -51,247 +233,199 @@ def verbosity(lvl):
 
 
 def call_cpp(*args):
-	invoke(cpp_prog, *args)
+	invoke(config.cpp_prog, *args)
 def invoke_cpp(*args):
-	allargs = verbosity(cpp_verbose)
-	allargs += cpp_flags
+	allargs = verbosity(config.cpp_verbose)
+	allargs += config.cpp_flags
 	allargs += args
 	call_cpp(*allargs)
 
 def call_ppcg(*args):
-	invoke(ppcg_prog, *args)
+	invoke(config.ppcg_prog, *args)
 def invoke_ppcg(*args):
-	allargs = verbosity(ppcg_verbose)
-	allargs += ppcg_flags
+	allargs = verbosity(config.ppcg_verbose)
+	allargs += config.ppcg_flags
 	allargs += args
 	call_ppcg(*args)
 
 def call_optimizer(*args):
-	invoke(optimizer_prog, *args)
+	invoke(config.optimizer_prog, *args)
 def invoke_optimizer(*args):
 	allargs = []
-	if optimizer_verbose:
+	if config.optimizer_verbose:
 		allargs += ['-dump-passes']
-	allargs += optimizer_flags
+	allargs += config.optimizer_flags
 	allargs += args
 	call_optimizer(*allargs)
 
 def call_cc(*cmdline):
-	invoke(cc_prog, *cmdline)
+	invoke(config.cc_prog, *cmdline)
 def invoke_cc(*cmdline):
-	extra_flags = verbosity(cc_verbose)
-	extra_flags += cc_flags
+	extra_flags = verbosity(config.cc_verbose)
+	extra_flags += config.cc_flags
 	extra_flags += cmdline
 	call_cc(*extra_flags)
+
+# Currently unused
+def invoke_libtool_cc(*cmdline):
+	extra_flags = verbosity(config.cc_verbose)
+	extra_flags += config.cc_flags
+	extra_flags += cmdline
+	invoke('libtool', '--mode=link',  '--tag=CC', cc_prog, *extra_flags)
 
 
 def print_versions():
 	print("PENCIL driver ", '''@GIT_HEAD_ID@''')
 	print()
 	
-	if cpp_prog:
-		print("cpp:", cpp_prog)
+	if config.cpp_prog:
+		print("cpp:", config.cpp_prog)
 		try:
 			call_cpp('--version')
 		except:
 			pass
 		
-	if optimizer_prog:
-		print("optimizer: ", optimizer_prog)
+	if config.optimizer_prog:
+		print("optimizer: ", config.optimizer_prog)
 		try:
 			call_optimizer('--version')
 		except e:
 			pass
 
-	if ppcg_prog:
-		print("ppcg: ", ppcg_prog)
+	if config.ppcg_prog:
+		print("ppcg: ", config.ppcg_prog)
 		try:
 			call_ppcg('--version')
 		except:
 			pass
 
-	if cc_prog:
-		print("cc: ", cc_prog)
+	if config.cc_prog:
+		print("cc: ", config.cc_prog)
 		try:
 			call_cc('--version')
 		except:
 			pass
 
 
-def locate(filename, paths, default=None):
-	for path in paths:
-		if not path:
-			continue
-		filepath = os.path.join(path,filename)
-		if os.path.isfile(filepath):
-			print('FOUND: ',filepath)
-			return os.path.abspath(filepath)
-		else:
-			print('TEST:  ',filepath)
-	return default
-
-
-
-def main():
-	# Interfacing with environment variables
-	CC = os.environ.get('CC')
-	CPP = os.environ.get('CPP')
-	CFLAGS = shlex.split(os.environ.get('CFLAGS') or '')
-	CPPFLAGS = shlex.split(os.environ.get('CPPFLAGS') or '')
-	LFLAGS = shlex.split(os.environ.get('LFLAGS') or '')
-	
-	
-	# Interfacing with autoconf
-	with_ppcg='''@with_ppcg@'''
-	with_pencil='''@with_pencil@'''
-	prefix='''@prefix@'''
-	eprefix='''@eprefix@'''
-	abs_builddir='''@abs_builddir@'''
-	abs_srcdir='''@abs_srcdir@'''
-	includedir='''@includedir@'''.replace('''${prefix}''', prefix)
-	bindir='''@bindir@'''
-
-	pencilcc_build=os.path.join(abs_builddir,'pencilcc.py')
-	print(os.path.abspath(sys.argv[0]) )
-	print(os.path.abspath(pencilcc_build))
-	is_build=os.path.abspath(sys.argv[0]) == os.path.abspath(pencilcc_build)
-
-	ocl_utilities_cflags = []
-	ocl_utilities_cppflags = []
-	pencil_h_cppflags = []
-	
-	global ppcg_prog
-	if is_build:
-		# Script runs from build directory
-		if with_ppcg=='no':
-			print("No ppcg")
-			ppcg_prog=None
-		elif with_ppcg=='bundled' or with_ppcg=='build':
-			if with_ppcg=='bundled':
-				print("Bundled ppcg")
-				PPCG_BUILDDIR=os.path.join(abs_builddir,'ppcg')
-				PPCG_SRCDIR=os.path.join(abs_srcdir,'ppcg')
-			elif with_ppcg=='build':
-				print("Builddir ppcg")
-				PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
-				PPCG_SRCDIR='''@PPCG_SRCDIR@'''
-			ppcg_prog=os.path.join(PPCG_BUILDDIR,'ppcg')
-			#ocl_utilities_c = os.path.join(PPCG_SRCDIR, 'ocl_utilities.c')
-			#ocl_utilities_h = os.path.join(PPCG_SRCDIR, 'ocl_utilities.h')
-			ocl_utilities_cppflags += ['-I', PPCG_SRCDIR]
-		else: # System
-			print("System ppcg")
-			ppcg_prog='ppcg'
-		ocl_utilities_cflags += [os.path.join(PPCG_SRCDIR,'ocl_utilities.c')]
-		pencil_h_cppflags += ['-I', os.path.join(abs_srcdir,'pencil-util','include')]
-	else:
-		print("Installed ppcg")
-		# Script runs from installed location (or has never been configured); Ignore build path
-		if bindir:
-			ppcg_prog=os.path.join(bindir,'ppcg')
-		if includedir:
-			ocl_utilities_cppflags += ['-I', includedir]
-			pencil_h_cppflags += ['-I', includedir]
-			
-		#ocl_utilities_c = 'ocl_utilities.c' #TODO: Install (or make it a lib)
-		#ocl_utilities_h = locate('ocl_utilities.h', paths=[includedir], default='ocl_utilities.h')
-
-
-	global optimizer_prog
-	if is_build:
-		if with_pencil=='no':
-			print("No pencil-optimizer")
-			optimizer_prog=None
-		elif with_pencil=='bundled' or with_pencil=='build': 
-			if with_pencil=='bundled':
-				print("Bundled pencil-optimizer")
-				PENCIL_BUILDDIR=os.path.join(abs_builddir,'pencil')
-				PENCIL_SRCDIR=os.path.join(abs_srcdir,'pencil')
-			elif with_pencil=='build':
-				print("Builddir pencil-optimizer")
-				PENCIL_BUILDDIR='''@PENCIL_BUILDDIR@'''
-				PENCIL_SRCDIR='''@PENCIL_SRCDIR@'''
-			optimizer_prog=os.path.join(PENCIL_BUILDDIR,'pencil-optimizer')
-		else:
-			print("System pencil-optimizer")
-			optimizer_prog='pencil-optimizer'
-	else:
-		print("Installed pencil-optimizer")
-		if bindir:
-			optimizer_prog=os.path.join(bindir,'pencil-optimizer')
-
-	
-
-	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.")
-	parser.add_argument('-v', '--verbose', action='count', default=0)
+def parsecmd(defaultcfg):
+	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.",add_help=False)
+	parser.add_argument('-h', '--help', action='store_true', help="Show this help message and exit")
+	parser.add_argument('-v', '--verbose', action='count', default=0, help="More verbose output")
 	parser.add_argument('--version', action='store_true', help="Print versions of involved programs")
-	parser.add_argument('--show-commands', action='store_true', help="Print executed commands")
-	parser.add_argument('--show-commands-baseonly', action='store_true', help="Do not print full command path")
-	parser.add_argument('--noselfupdate', dest='selfupdate', default=True, action='store_false', help="Do not try to update yourself")
+	parser.add_argument('--noselfupdate', dest='selfupdate', action='store_false', default=True,
+		help="Do not try to update yourself" if is_build() else argparse.SUPPRESS)
+	parser.add_argument('--show-commands', action='store_true', default=False, help="Print executed commands")
+	parser.add_argument('--show-commands-baseonly', action='store_true', default=False, help="Do not print full command path")	
+	parser.add_argument('--pencil-config', choices=['system', 'build', 'install'], help="Introspection to use")
+	parser.add_argument('--keep', action='store_true', help="Keep temporary files in working directory")
 	
-	parser.add_argument('--pencil-cpp-path', metavar='CC', default=CPP or 'cpp')
+	parser.add_argument('--pencil-cpp-path', metavar='CPP', help="Path to preprocessor (default: " + defaultcfg.cpp_prog + ")")
 	
-	if optimizer_prog is not None:
-		parser.add_argument('--pencil-opt', action='store_true', default=False, help="Use pencil-optimizer in toolchain")
-		parser.add_argument('--pencil-opt-path', metavar='OPTIMIZER', help="Path to optimizer (default: " + optimizer_prog + ")")
-	
-	if ppcg_prog is not None:
-		parser.add_argument('--pencil-ppcg', action='store_true', default=False, help="Use ppcg in toolchain")
-		parser.add_argument('--pencil-ppcg-path', metavar='PPCG', help="Path to ppcg (default: " + ppcg_prog + ")")
-	
-	parser.add_argument('--pencil-cc-path', metavar='CC', default=CC or 'cc')
+	parser.add_argument('--pencil-opt', action='store_true', default=None,
+		help="Use pencil-optimizer in toolchain" if not defaultcfg.use_optimizer and with_pencil!='no' else argparse.SUPPRESS)
+	parser.add_argument('--pencil-noopt', action='store_true', default=None,
+		help="Do not use pencil-optimizer in toolchain" if defaultcfg.use_optimizer and with_pencil!='no' else argparse.SUPPRESS)
+	parser.add_argument('--pencil-opt-path', metavar='OPTIMIZER', default=None, help="Path to optimizer (default: " + defaultcfg.optimizer_prog + ")")
 
-	parser.add_argument('--pencil-runtime', action='store_true', help="Use the PENCIL OpenCL runtime")
+	parser.add_argument('--pencil-ppcg', action='store_true', default=None,
+		help="Use ppcg in toolchain" if not defaultcfg.use_ppcg and with_ppcg!='no' else argparse.SUPPRESS)
+	parser.add_argument('--pencil-noppcg', action='store_true',  default=None,
+		help="Do not use ppcg in toolchain" if defaultcfg.use_ppcg and with_ppcg!='no' else argparse.SUPPRESS)
+	parser.add_argument('--pencil-ppcg-path', metavar='PPCG', default=None, help="Path to ppcg (default: " + defaultcfg.ppcg_prog + ")")
 
-	# Compatibility arguments
+	parser.add_argument('--pencil-cc-path', metavar='CC', help="C compiler (default: " + defaultcfg.cc_prog + ")")
+
+	parser.add_argument('--pencil-runtime', action='store_true', 
+		help="Use the PENCIL OpenCL runtime" if not defaultcfg.use_runtime else argparse.SUPPRESS)
+	parser.add_argument('--pencil-noruntime', action='store_true', 
+		help="Do not use the PENCIL OpenCL runtime" if defaultcfg.use_runtime else argparse.SUPPRESS)
+
+	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT')
 
+	known,unkown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
+	return known,unkown,parser
 
-	known, unknown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
-	print(known,unknown)
 
+def get_config_from_argparse(known, unkown):
+	config = Configuration()
+	
+	config.cpp_prog = known.pencil_cpp_path
+	config.cpp_verbose = max(0, known.verbose - 1)
+	
+	
+	if known.pencil_opt is not None:
+		config.use_optimizer = True
+		
+	if known.pencil_opt_path is not None:
+		config.use_optimizer = True
+		config.optimizer_prog = known.pencil_opt_path
+		
+	if known.pencil_noopt is not None:
+		config.use_optimizer = False
+	config.optimizer_verbose = max(0, known.verbose - 1)
+	
+	
+	if known.pencil_ppcg is not None:
+		config.use_ppcg = True
+		
+	if known.pencil_ppcg_path is not None:
+		config.use_ppcg = True
+		config.ppcg_prog = known.pencil_ppcg_path
+		
+	if known.pencil_noopt is not None:
+		config.use_ppcg = False
+	config.ppcg_verbose = max(0, known.verbose - 1)
+		
+		
+	config.cc_prog = known.pencil_cc_path
+	config.cc_verbose = max(0, known.verbose - 1)
+	
+	
+	if known.pencil_runtime is not None:
+		config.use_runtime = True
+	if known.pencil_noruntime is not None:
+		config.use_runtime = False
+	
+	return config
+	
+	
+def main():
+	known, unknown, parser = parsecmd(get_system_config())
+	
+	# Do early because the selfupdate feature reads it
 	global print_commands,print_commands_baseonly
 	print_commands = (known.verbose > 0) or known.show_commands or known.show_commands_baseonly
 	print_commands_baseonly = known.show_commands_baseonly
 
-	scriptdir =  os.path.dirname(sys.argv[0])
-	if known.selfupdate and (os.path.isfile(os.path.join(scriptdir, 'Makefile')) or os.path.isfile(os.path.join(scriptdir, 'makefile'))):
-		invoke('make','pencilcc.py') #TODO: chdir scriptdir
+	# Re-configure the script automatically if in builddir
+	if known.selfupdate and is_build():
+		invoke('make', os.path.basename(script))
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
-		print_command(*cmdline)
-		rtn = subprocess.call(cmdline)
-		exit(rtn)
+		invoke(*cmdline) # TODO: chdir=os.path.dirname(script)
+		return
+	
+	global config
+	config = get_config_from_argparse(known, unknown)
+	if known.pencil_config=='system':
+		config.merge(get_system_config())
+	elif known.pencil_config=='build':
+		config.merge(get_build_config())
+	elif known.pencil_config=='install':
+		config.merge(get_install_config())
+	else:
+		config.merge(get_default_config())
 
- 
-	global cpp_prog,cpp_flags,cpp_verbose
-	cpp_prog = known.pencil_cpp_path or CPP or cpp_prog
-	cpp_flags = CPPFLAGS
-	cpp_verbose = max(cpp_verbose, known.verbose - 1)
+	if known.help:
+		known, unknown, parser = parsecmd(config) # To use correct defaults
+		parser.print_help()
+		return 
 	
-	global optimizer_prog,optimizer_flags,optimizer_verbose
-	optimizer_prog = known.pencil_opt_path or optimizer_prog
-	optimizer_verbose = max(optimizer_verbose, known.verbose-1)
-	
-	global ppcg_verbose 
-	ppcg_prog = known.pencil_ppcg_path or ppcg_prog
-	if known.verbose > 1:
-		ppcg_verbose = known.verbose - 1
-	
-	global cc_prog,cc_flags,cc_verbose
-	cc_prog = known.pencil_cc_path or cc_prog
-	cc_flags = [] + CPPFLAGS + CFLAGS
-	if known.verbose > 1:
-		cc_verbose = known.verbose - 1
-	
-	use_ppcg = known.pencil_ppcg or known.pencil_ppcg_path
-	use_optimizer = known.pencil_opt or known.pencil_opt_path
-	use_runtime = known.pencil_runtime
-	
+	print (known)
 	if known.version:
 		print_versions()
-		exit(0)
+		return
 
-	
 	files = []
 	ccargs = []
 	
@@ -301,59 +435,98 @@ def main():
 		else:
 			ccargs.append(arg)
 		
-	if known.o is not None:
-		ccargs += ['-o', known.o]
-		
-	#print("Input files:", files)
-	#print("No special handling for (passed to cc):", ccargs)
-	
 	if not files:
 		print("No input files")
 		exit(4)
 		
+	if known.keep:
+		compile(files, ccargs, None, known.o)
+	else:
+		with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
+			compile(files, ccargs, tmpdir, known.o)
+		
+
+def get_cppflags(stage):
+	global config
+	cppflags = []
+	if stage is None:
+		cppflags += ['-D__PENCIL__']
+	else:
+		cppflags += ['-D__PENCIL__=' + str(stage)]
+	cppflags += config.cpp_flags
+	cppflags += config.common_cppflags
+	cppflags += config.pencil_h_cppflags
+	if config.use_runtime:
+		cppflags += config.pencil_runtime_cppflags
+	else:
+		cppflags += config.ocl_utilities_cppflags
+	return cppflags
 
 
-	#with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
-	tmpdir = tempfile.mkdtemp(prefix='pencil.')
-	while True:
-		outfiles = []
-		for infile in files:
-			ispencil = infile.endswith('.pencil.c')
-			basename = os.path.basename(infile)
-			rootname = os.path.splitext(basename)[0]
-			file = infile
+def compile(files, ccargs, tmpdir, output):
+	global config
+	print(config.__dict__)
+	
+	outfiles = []
+	for infile in files:
+		ispencil = infile.endswith('.pencil.c')
+		dirname, basename = os.path.split(infile)
+		rootname,ext = os.path.splitext(basename)
+		file = infile
+		
+		if config.use_optimizer and ispencil:
+			if tmpdir is None:
+				subdir = dirname
+			else:
+				subdir = tempfile.mkdtemp(prefix='opt.', dir=tmpdir)
+			cppfile = os.path.join(subdir, rootname + '.cpp' + ext)
+			optfile = os.path.join(subdir, rootname + '.opt' + ext)
 			
-			if use_optimizer and ispencil:
-				tmpsubdir = tempfile.mkdtemp(prefix='opt.',dir=tmpdir)
-				
-				cppfile = os.path.join(tmpsubdir, basename + '.i')
-				cppargs = []
-				cppargs += ['-D__PENCIL__=1']
-				cppargs += pencil_h_cppflags
-				cppargs += ['-P',file,'-o', cppfile]
-				invoke_cpp(*cppargs)
+			cppargs = []
+			cppargs += get_cppflags(1)
+			cppargs += ['-P', file, '-o', cppfile]
+			invoke_cpp(*cppargs)
 
-				optfile =  os.path.join(tmpsubdir, rootname + '.opt.c')
-				invoke_optimizer(cppfile,'-o',optfile)
-				file = optfile
+			invoke_optimizer(cppfile,'-o',optfile)
+			file = optfile
+		
+		if config.use_ppcg:
+			if tmpdir is None:
+				subdir = dirname
+				outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
+			else:
+				subdir = tempfile.mkdtemp(prefix='ppcg.',dir=tmpdir)
+				outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
 			
-			if use_ppcg:
-				tmpsubdir = tempfile.mkdtemp(prefix='ppcg.',dir=tmpdir)
-				outfile = os.path.join(tmpsubdir, basename)
-				ppcgargs = []
-				ppcgargs += ['-D__PENCIL__=2']
-				ppcgargs += ['--target=opencl']
-				if ispencil:
-					ppcgargs += ['--pet-autodetect']
-				ppcgargs += pencil_h_cppflags
-				ppcgargs += [file, '-o', outfile]
-				invoke_ppcg(*ppcgargs)
-				file = outfile
-				
-			outfiles.append(file)
+			ppcgargs = []
+			ppcgargs += get_cppflags(2)
+			ppcgargs += ['--target=opencl']
+			if ispencil:
+				ppcgargs += ['--pet-autodetect']
+			if config.use_runtime:
+				ppcgargs += ['--opencl-pencil-runtime']
+			ppcgargs += [file, '-o', outfile]
+			invoke_ppcg(*ppcgargs)
+			file = outfile
+			
+		outfiles.append(file)
 
-		invoke_cc(*(['-std=c99', '-D__PENCIL__=3'] + ccargs + pencil_h_cppflags + ocl_utilities_cppflags + ocl_utilities_cflags + outfiles + ['-lm', '-lOpenCL']))
-		break
+	ccargs = []
+	ccargs += get_cppflags(3)
+
+	ccargs += ['-std=c99']
+	ccargs += config.common_cflags
+	ccargs += config.common_lflags
+	if not config.use_runtime:
+		ccargs += config.ocl_utilities_cflags
+	ccargs += outfiles
+	if config.use_runtime:
+		ccargs += config.pencil_runtime_lflags
+	ccargs += ['-lm', '-lOpenCL']
+	if output:
+		ccargs += ['-o', output]
+	invoke_cc(*ccargs)
+		
 
 
 if __name__ == '__main__':

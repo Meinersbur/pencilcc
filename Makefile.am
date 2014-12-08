@@ -1,3 +1,4 @@
+# @configure_input@
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -7,9 +8,16 @@ endif
 if BUNDLED_PENCIL
     MAYBE_PENCIL = pencil
 endif
+if BUNDLED_PENCIL_UTIL
+    MAYBE_PENCIL_UTIL = pencil-util
+endif
 
-SUBDIRS = $(MAYBE_PPCG) $(MAYBE_PENCIL)
+SUBDIRS = $(MAYBE_PPCG) $(MAYBE_PENCIL) $(MAYBE_PENCIL_UTIL)
 
-#lib_LTLIBRARIES = libocl_utilities.la
-#libocl_utilities_la_SOURCES = ocl_utilities.c
-#include_HEADERS = ocl_utilities.h 
+pencilcc: pencilcc.py
+	ln -sf $< $@
+
+all-local: pencilcc
+
+clean-local:
+	rm -f pencilcc

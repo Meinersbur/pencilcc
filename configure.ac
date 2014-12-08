@@ -40,9 +40,11 @@ AC_SUBST(GIT_HEAD_ID)
 
 
 
+abs_builddir=`pwd` # ${ac_abs_builddir}
 
 AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
+
 
 
 
@@ -57,10 +59,14 @@ case "$with_ppcg" in
 no)
 	;;
 bundled)
+	PPCG_BUILDDIR="${abs_builddir}/ppcg"
+	PPCG_SRCDIR="${srcdir}/ppcg"
+	oclutilities_path="${PPCG_SRCDIR}/ocl_utilities.c"
 	;;
 build)
 	PPCG_BUILDDIR=`echo @abs_builddir@ | $with_ppcg_builddir/config.status --file=-`
 	PPCG_SRCDIR=`echo @abs_srcdir@ | $with_ppcg_builddir/config.status --file=-`
+	oclutilities_path="${PPCG_SRCDIR}/ocl_utilities.c"
 	;;
 system)
 	PKG_CHECK_MODULES([PPCG], [ppcg])
@@ -70,18 +76,20 @@ AM_CONDITIONAL(BUNDLED_PPCG, test "x$with_ppcg" = xbundled)
 
 
 
-AC_SUBST(PPCG_BUILDDIR)
-AC_SUBST(PPCG_SRCDIR)
+AC_SUBST(PENCIL_BUILDDIR)
+AC_SUBST(PENCIL_SRCDIR)
 AC_SUBST(with_pencil)
 AX_SUBMODULE(pencil,build|bundled|system|no,bundled)
 case "$with_pencil" in
 no)
 	;;
 bundled)
+	PENCIL_BUILDDIR="${abs_builddir}/pencil"
+	PENCIL_SRCDIR="${srcdir}/pencil"
 	;;
 build)
-	PENCIL_BUILDDIR=`echo @abs_builddir@ | $with_ppcg_builddir/config.status --file=-`
-	PENCIL_SRCDIR=`echo @abs_srcdir@ | $with_ppcg_builddir/config.status --file=-`
+	PENCIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_builddir/config.status --file=-`
+	PENCIL_SRCDIR=`echo @abs_srcdir@ | $with_pencil_builddir/config.status --file=-`
 	;;
 system)
 	;;
@@ -89,11 +97,32 @@ esac
 AM_CONDITIONAL(BUNDLED_PENCIL, test "x$with_pencil" = xbundled)
 
 
+AC_SUBST(PENCIL_UTIL_BUILDDIR)
+AC_SUBST(PENCIL_UTIL_SRCDIR)
+AC_SUBST(with_pencil_util)
+AX_SUBMODULE(pencil-util,build|bundled|system|no,bundled)
+case "$with_pencil_util" in
+no)
+	;;
+bundled)
+	PENCIL_UTIL_BUILDDIR="${abs_builddir}/pencil-util"
+	PENCIL_UTIL_SRCDIR="${srcdir}/pencil-util"
+	;;
+build)
+	PENCIL_UTIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_util_builddir/config.status --file=-`
+	PENCIL_UTIL_SRCDIR=`echo @abs_srcdir@ | $with_pencil_util_builddir/config.status --file=-`
+	;;
+system)
+	;;
+esac
+AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_util" = xbundled)
+
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
 AC_CONFIG_FILES([Makefile])
-#AC_CONFIG_FILES([pencil-util/runtime/Makefile])
+
+
 
 if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
@@ -103,10 +132,13 @@ if test x"$with_pencil" = xbundled; then
 	AC_CONFIG_SUBDIRS(pencil)
 fi
 
-#AC_CONFIG_COMMANDS_POST([
-#	dnl pass on arguments to subdir configures, but don't
-#	dnl add them to config.status
-#	ac_configure_args="$ac_configure_args $ppcg_configure_args"
-#])
+if test x"$with_pencil_util" = xbundled; then
+	AC_CONFIG_SUBDIRS(pencil-util)
+fi
 
+AC_CONFIG_COMMANDS_POST([
+	dnl pass on arguments to subdir configures, but don't
+	dnl add them to config.status
+	ac_configure_args="${ac_configure_args} --with-ocl_utilities=${oclutilities_path}"
+])
 AC_OUTPUT
