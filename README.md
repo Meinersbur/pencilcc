@@ -69,6 +69,8 @@ Currently *.pencil.c files are assumed to contain pure PENCIL code (sublanguage 
 
 CC=pencilcc (globally or by build utilitity) won't work; pencilcc uses this to determine which compiler to call and would potentially call itself.
 
+The directories example/plain and example/cext contain scripts (example.sh) that call pencilcc to demonstrate the behaviour.
+
 
 
 Known Issues
