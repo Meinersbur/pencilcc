@@ -41,9 +41,9 @@ In theory:
 
 In practice your distribution's Scala and ANTLR3 are probably not recent enough (e.g. Ubuntu 13.10 has only Scala 2.9.2 and ANTLR3 3.2 anf antlr3-task is not available at all)
 
-Installation instructions for Ubuntu 13.10 (Utopic Unicorn):
+Installation instructions tested on Ubuntu 13.10 (Utopic Unicorn):
 
-0) sudo apt-get install build-essential pkg-config libgmp-dev libclang-dev ant python3
+0) sudo apt-get install build-essential pkg-config libgmp-dev libclang-dev ant python3 libedit-dev opencl-headers
 1) git clone https://github.com/Meinersbur/pencil-driver.git
 2) cd pencil-driver
 3) git submodule update --init --recursive
@@ -52,7 +52,34 @@ Installation instructions for Ubuntu 13.10 (Utopic Unicorn):
 6) ./autogen.sh
 7) ./configure
 8) make
+9) sudo make install
 
-Be aware that this creates directories pencil-driver/scala and pencil-driver/antlr3 that are required even after make install.
+Be aware that this creates directories pencil-driver/scala and pencil-driver/antlr3 that are required even after make install.  Install those localy and and those jars to CLASSPATH before ./configure to avoid this. 
+
+
+
+Usage
+=====
+
+pencilcc is a compiler invocation replacement.  Replace your compiler call by pencilcc.  Call pencilcc --help for options.
+
+
+
+
+Known Problems
+==============
+
+- pencilcc assumes the compiler accepts gcc command line syntax
+- pencilcc assumes the compiler invocation includes linking; i.e. the options -c (compile to .o) and -E (precompile) are not recognized 
+- Some warnings are unavoidable (e.g. unkonwn attribute)
+- ppcg --version reports UNKNOWN for its own version
+
+Untested features:
+- Any --with-PACKAGE option other than bundled
+- Systems other than Ubuntu 13.10
+- make check, or testing in general
+
+
+
 
 
