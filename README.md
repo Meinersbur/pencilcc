@@ -55,6 +55,7 @@ Installation instructions tested on Ubuntu 13.10 (Utopic Unicorn):
 7) ./configure
 8) make
 9) sudo make install
+10) sudo ldconfig
 
 Be aware that this creates directories pencil-driver/scala and pencil-driver/antlr3 that are required even after make install.  Install those localy and those jars to CLASSPATH before ./configure to avoid this. 
 
