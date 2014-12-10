@@ -41,9 +41,9 @@ In theory:
 7) sudo make install
 
 
-In practice your distribution's Scala and ANTLR3 are probably not recent enough (e.g. Ubuntu 13.10 has only Scala 2.9.2 and ANTLR3 3.2 anf antlr3-task is not available at all)
+In practice your distribution's Scala and ANTLR3 are probably not recent enough (e.g. Ubuntu 14.10 has only Scala 2.9.2 and ANTLR3 3.2 anf antlr3-task is not available at all)
 
-Installation instructions tested on Ubuntu 13.10 (Utopic Unicorn):
+Installation instructions tested on Ubuntu 14.10 (Utopic Unicorn):
 
 0) sudo apt-get install build-essential pkg-config libgmp-dev libclang-dev ant python3 libedit-dev opencl-headers
 1) git clone https://github.com/Meinersbur/pencil-driver.git
