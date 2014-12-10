@@ -413,15 +413,17 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--pencil-runtime-opt', action='store_true', default=None,
 		help="Use optimized runtime" if not defaultcfg.optruntime else argparse.SUPPRESS)
 
-	# Passed to cpp and cc
+	# Passed to cpp (and cc)
 	parser.add_argument('-D', action='append', default=[], help=argparse.SUPPRESS)
+	parser.add_argument('-I', action='append', default=[], help=argparse.SUPPRESS)
 
 	# Passed to ppcg instead to cc
 	parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[])
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
-
+	parser.add_argument('-c', action='store_true', help=argparse.SUPPRESS)
+	
 	known,unkown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
 	return known,unkown,parser
 
@@ -533,16 +535,18 @@ def main():
 	user_cppflags = []
 	for flag in known.D:
 		user_cppflags += ['-D' + flag]
+	for l in known.I:
+		user_cppflags += ['-I', l]
 		
 	ppcgargs = []
 	for incfile in known.opencl_include_file:
 		ppcgargs += ['--opencl-include-file=' + incfile]
 	
 	if known.keep:
-		compile(files, user_cppflags, ppcgargs, ccargs, None, known.o)
+		compile(files, user_cppflags, ppcgargs, ccargs, None, known.o, not known.c)
 	else:
 		with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
-			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o)
+			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o, not known.c)
 			
 	if known.run:
 		execfilename = 'a.out'
@@ -592,23 +596,28 @@ def get_cppflags(stage, user_cppflags):
 	return cppflags
 
 
-def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
+def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output, linking):
 	global config
 
 	outfiles = []
+	origdirrefs = []
 	for infile in files:
 		ispencil = infile.endswith('.pencil.c')
 		dirname, basename = os.path.split(infile)
 		rootname,ext = os.path.splitext(basename)
+		isnotc = (ext=='.a') or (ext=='.so') or (ext=='.o')
+		isoptimizable = not isnotc
 		file = infile
+		origdirref = []
 		
-		if config.use_optimizer and ispencil:
+		if isoptimizable and config.use_optimizer and ispencil:
 			if tmpdir is None:
 				subdir = dirname
 			else:
 				subdir = tempfile.mkdtemp(prefix='opt.', dir=tmpdir)
 			cppfile = os.path.join(subdir, rootname + '.cpp' + ext)
 			optfile = os.path.join(subdir, rootname + '.opt' + ext)
+			origdirref += ['-I', dirname]
 			
 			cppargs = []
 			cppargs += get_cppflags(1, user_cppflags)
@@ -618,7 +627,7 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 			invoke_optimizer(cppfile,'-o',optfile)
 			file = optfile
 		
-		if config.use_ppcg:
+		if isoptimizable and config.use_ppcg:
 			if tmpdir is None:
 				subdir = dirname
 				outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
@@ -628,6 +637,11 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 			
 			ppcgargs = copy.copy(user_ppcgargs)
 			ppcgargs += get_cppflags(2, user_cppflags)
+			ppcgargs += origdirref
+			if origdirref:
+				ppcgargs += origdirref
+			else:
+				origdirref = ['-I', dirname]
 			ppcgargs += ['--target=opencl']
 			if ispencil:
 				ppcgargs += ['--pet-autodetect']
@@ -641,24 +655,29 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 			file = outfile
 			
 		outfiles.append(file)
+		origdirrefs += origdirref
 
 	ccargs = []
+	ccargs += origdirrefs
 	ccargs += get_cppflags(3, user_cppflags)
 	ccargs += ['-std=c99']
 	if config.use_optimizer:
 		ccargs += ['-Wno-attributes']
-	ccargs += user_ccargs
 	ccargs += config.common_cflags
 	ccargs += config.common_lflags
 	if not config.use_runtime:
 		ccargs += config.ocl_utilities_cflags
 	ccargs += outfiles
-	if config.use_runtime:
-		if config.optruntime:
-			ccargs += config.pencil_runtime_opt_lflags
-		else:
-			ccargs += config.pencil_runtime_ref_lflags
-	ccargs += ['-lm', '-lOpenCL']
+	ccargs += user_ccargs # Must be after outfiles, they may contain -l flags where order matters (Actually, some libraries might could be linked BEFORE the outfiles, eg. electtric_fence, but we don't support that at the moment)
+	if linking:
+		if config.use_runtime:
+			if config.optruntime:
+				ccargs += config.pencil_runtime_opt_lflags
+			else:
+				ccargs += config.pencil_runtime_ref_lflags
+		ccargs += ['-lm', '-lOpenCL']
+	else:
+		ccargs += ['-c']
 	if output:
 		ccargs += ['-o', output]
 	invoke_cc(*ccargs)
