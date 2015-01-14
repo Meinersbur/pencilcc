@@ -14,7 +14,7 @@ endif
 
 SUBDIRS = $(MAYBE_PPCG) $(MAYBE_PENCIL) $(MAYBE_PENCIL_UTIL)
 
-CLEANFILES: pencilcc.py pencilcc
+CLEANFILES = pencilcc.py pencilcc
 
 pencilcc: pencilcc.py
 	ln -sf $< $@

@@ -98,6 +98,9 @@ fi
 if test -f "${abs_srcdir}/scala/bin/scala"; then
 	subconfigure_addargs="${subconfigure_addargs} SCALA=${abs_srcdir}/scala/bin/scala"
 fi
+if test -f "${abs_srcdir}/scala/bin/scaladoc"; then
+	subconfigure_addargs="${subconfigure_addargs} SCALADOC=${abs_srcdir}/scala/bin/scaladoc"
+fi
 
 AC_SUBST(PENCIL_UTIL_BUILDDIR)
 AC_SUBST(PENCIL_UTIL_SRCDIR)
@@ -109,6 +112,7 @@ no)
 bundled)
 	PENCIL_UTIL_BUILDDIR="${abs_builddir}/pencil-util"
 	PENCIL_UTIL_SRCDIR="${abs_srcdir}/pencil-util"
+	subconfigure_addargs="${subconfigure_addargs} --with-pencil-util=build --with-pencil-util-builddir=${PENCIL_UTIL_BUILDDIR}" # Will overwrite inherited --with-pencil=bundled argument 
 	;;
 build)
 	PENCIL_UTIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_util_builddir/config.status --file=-`
