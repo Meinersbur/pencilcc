@@ -1,8 +1,12 @@
-# http://www.gnu.org/software/automake
+# Automake
 Makefile.in
+Makefile
+.dirstamp
+*.o
 
-# http://www.gnu.org/software/autoconf
-/autom4te.cache
+# Autoconf
+/build-aux/
+/autom4te.cache/
 /aclocal.m4
 /compile
 /configure
@@ -10,14 +14,20 @@ Makefile.in
 /install-sh
 /missing
 /stamp-h1
-/build-aux/
+/config.log
+/config.status
 
 # Libtool
+/libtool
 /m4/libtool.m4
 /m4/ltoptions.m4
 /m4/ltversion.m4
 /m4/lt~obsolete.m4
 /m4/ltsugar.m4
+.deps/
+.libs/
+*.la
+*.lo
 
 # KDE Dolphin
 .directory
