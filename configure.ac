@@ -2,12 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pencil-driver], [0.0], [carp-pencil@imperial.ac.uk])
+AC_INIT([pencil-driver], [0.1], [carp-pencil@imperial.ac.uk])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Automake
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AM_INIT_AUTOMAKE([1.14 -Wall foreign tar-ustar])
 AM_MAINTAINER_MODE([enable])
 
 # Checks for programs.
@@ -22,7 +22,7 @@ AC_SUBST(GIT_HEAD_ID)
 
 dnl I there no official way yo get the build directory?
 abs_builddir=`pwd` # ${ac_abs_builddir} 
-abs_srcdir="${srcdir}"
+abs_srcdir=$(readlink -m "${srcdir}")
 
 AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
@@ -44,12 +44,10 @@ no)
 bundled)
 	PPCG_BUILDDIR="${abs_builddir}/ppcg"
 	PPCG_SRCDIR="${abs_srcdir}/ppcg"
-	oclutilities_path="${PPCG_SRCDIR}/ocl_utilities.c"
 	;;
 build)
 	PPCG_BUILDDIR=`echo @abs_builddir@ | $with_ppcg_builddir/config.status --file=-`
 	PPCG_SRCDIR=`echo @abs_srcdir@ | $with_ppcg_builddir/config.status --file=-`
-	oclutilities_path="${PPCG_SRCDIR}/ocl_utilities.c"
 	;;
 system)
 	PKG_CHECK_MODULES([PPCG], [ppcg])
@@ -128,23 +126,19 @@ AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_util" = xbundled)
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
 AC_CONFIG_FILES([Makefile])
 
-
-
+if test x"$with_pencil_util" = xbundled; then
+	AC_CONFIG_SUBDIRS(pencil-util)
+fi
 if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
 fi
-
 if test x"$with_pencil" = xbundled; then
 	AC_CONFIG_SUBDIRS(pencil)
-fi
-
-if test x"$with_pencil_util" = xbundled; then
-	AC_CONFIG_SUBDIRS(pencil-util)
 fi
 
 AC_CONFIG_COMMANDS_POST([
 	dnl pass on arguments to subdir configures, but don't
 	dnl add them to config.status
-	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} ${subconfigure_addargs} --with-ocl_utilities=${oclutilities_path}" 
+	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} ${subconfigure_addargs}" 
 ])
 AC_OUTPUT
