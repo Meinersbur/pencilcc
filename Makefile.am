@@ -27,15 +27,17 @@ EXTRA_DIST = \
 	README.md \
 	examples \
 	get-scala.sh get-antlr3.sh \
-	scala antlr3
+	scala antlr3 \
+	tests/simple/check.sh \
+	tests/simple/example.c
 
 TESTS = tests/simple/check.sh
 
 AM_TESTS_ENVIRONMENT = \
-	echo "AM_TESTS_ENVIRONMENT"; \
-	export PENCILCC="${abs_builddir}/pencilcc"; \
-	export TESTSRCDIR=$(<D); \
-	echo "end AM_TESTS_ENVIRONMENT";
+	export PENCILCC="$(abs_builddir)/pencilcc"; \
+	export TESTSRCDIR="`dirname "$(abs_srcdir)/$${b}"`"; \
+	export TESTBUILDDIR="`dirname "$(abs_builddir)/$${b}"`/check"; \
+	$(MKDIR_P) "$${TESTBUILDDIR}";
 
 pencilcc: pencilcc.py
 	ln -sf $< $@
@@ -62,6 +64,16 @@ dist-local: scala antlr3
 installcheck-local:
 	for test in ${TESTS}; do \
 		export PENCILCC="${bindir}/pencilcc"; \
-		export TESTSRCDIR=`dirname "$${test}"`; \
-		$${test} || exit 1; \
+		export TESTSRCDIR="`dirname "$(abs_srcdir)/$${test}"`"; \
+		export TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`/installcheck"; \
+		$(MKDIR_P) "$${TESTBUILDDIR}"; \
+		echo "Checking `basename $${test}`..."; \
+		( cd "$${TESTBUILDDIR}" && "$(abs_srcdir)/$${test}") || exit 1; \
+	done
+
+clean-local:
+	for test in ${TESTS}; do \
+		TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`"; \
+		rm -rf "$${TESTBUILDDIR}/check"; \
+		rm -rf "$${TESTBUILDDIR}/installcheck"; \
 	done
