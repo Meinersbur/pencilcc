@@ -1,37 +1,40 @@
-# Automake
-Makefile.in
-Makefile
-.dirstamp
-*.o
-
-# Autoconf
-/build-aux/
-/autom4te.cache/
+# ./autogen.sh (autoreconf -i)
+/Makefile.in
 /aclocal.m4
-/compile
+/autom4te.cache/
+/build-aux/
 /configure
-/depcomp
-/install-sh
-/missing
-/stamp-h1
+
+# Manually installed dependencies (./get-scala.sh and ./get-antlr3.sh)
+/scala
+/antlr3
+
+# ./configure
+/Makefile
+/confdefs.h
 /config.log
 /config.status
+/pencilcc.py
 
-# Libtool
-/libtool
-/m4/libtool.m4
-/m4/ltoptions.m4
-/m4/ltversion.m4
-/m4/lt~obsolete.m4
-/m4/ltsugar.m4
-.deps/
-.libs/
-*.la
-*.lo
+# make
+/pencilcc
+
+# make check
+/test-suite.log
+/tests/*/*.log
+/tests/*/*.trs
+/tests/*/check
+
+# make installcheck
+/tests/*/installcheck
+
+# make dist
+/pencil-driver-*.tar.gz
+/pencil-driver-*.tar.bz2
+/pencil-driver-*.zip
 
 # KDE Dolphin
 .directory
 
-# Manually installed dependencies
-/scala
-/antlr3
+# Merging
+*.orig
