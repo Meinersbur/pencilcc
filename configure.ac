@@ -30,14 +30,15 @@ AC_SUBST(abs_srcdir)
 subconfigure_addargs=""
 
 
+AX_SUBMODULE_FWD(isl,build|bundled|system,bundled)
+AX_SUBMODULE_FWD(pet,build|bundled|system,bundled)
+AX_SUBMODULE_FWD(clang,build|system,system)
+
 
 AC_SUBST(PPCG_BUILDDIR)
 AC_SUBST(PPCG_SRCDIR)
 AC_SUBST(with_ppcg)
 AX_SUBMODULE(ppcg,no|build|bundled|system,bundled)
-AX_SUBMODULE_FWD(isl,build|bundled|system,bundled)
-AX_SUBMODULE_FWD(pet,build|bundled|system,bundled)
-AX_SUBMODULE_FWD(clang,build|system,system)
 case "$with_ppcg" in
 no)
 	;;
@@ -121,6 +122,30 @@ system)
 esac
 AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_util" = xbundled)
 
+
+
+AC_MSG_CHECKING([for PolyBench])
+AC_ARG_WITH(polybench,
+	[AS_HELP_STRING([--with-polybench=DIR],[PolyBench's location @<:@using bundled by default@:>@])],
+	[
+		with_polybench_result="${with_polybench}"
+	],[
+		dnl Default option: if ./polybench subdirectory exists
+		if test -z ""; then
+			if test -d "${abs_srcdir}/polybench"; then
+				with_polybench="${abs_srcdir}/polybench"
+				subconfigure_addargs="${subconfigure_addargs} --with-polybench=${abs_srcdir}/polybench"
+				with_polybench_result="${with_polybench} (bundled)"
+			else
+				with_polybench=no
+				subconfigure_addargs="${subconfigure_addargs} --without-polybench"
+				with_polybench_result="no (bundled not found)"
+			fi
+		fi
+	]
+	)
+
+AC_MSG_RESULT(${with_polybench_result})
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])

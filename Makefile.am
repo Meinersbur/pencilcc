@@ -26,8 +26,8 @@ EXTRA_DIST = \
 	autogen.sh \
 	README.md \
 	examples \
-	get-scala.sh get-antlr3.sh \
-	scala antlr3 \
+	get-scala.sh get-antlr3.sh get-polybench.sh \
+	scala antlr3 polybench \
 	tests/simple/check.sh \
 	tests/simple/example.c
 
@@ -58,8 +58,11 @@ scala: get-scala.sh
 antlr3: get-antlr3.sh
 	./get-antlr3.sh
 
+polybench: get-polybench.sh
+	./get-polybench.sh
+
 # Get the packages so they can be used by "make check"
-dist-local: scala antlr3
+dist-local: scala antlr3 polybench
 
 installcheck-local:
 	for test in ${TESTS}; do \

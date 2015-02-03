@@ -1,4 +1,5 @@
 #! /bin/sh
+set -e # Fail if any subcommand fails
 
 SCALA_HOME=./scala
 mkdir -p $SCALA_HOME

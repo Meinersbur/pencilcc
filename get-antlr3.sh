@@ -1,4 +1,5 @@
 #! /bin/sh
+set -e # Fail if any subcommand fails
 
 ANTLR_HOME=./antlr3
 mkdir -p $ANTLR_HOME
