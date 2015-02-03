@@ -5,9 +5,10 @@
 /build-aux/
 /configure
 
-# Manually installed dependencies (./get-scala.sh and ./get-antlr3.sh)
+# Manually installed dependencies (./get-scala.sh, ./get-antlr3.sh and ./get-polybench.sh)
 /scala
 /antlr3
+/polybench
 
 # ./configure
 /Makefile

@@ -7,4 +7,3 @@ wget http://www.antlr3.org/share/1169924912745/antlr3-task.zip -O /tmp/antlr3-ta
 unzip /tmp/antlr3-task.zip -d /tmp/antlr3-task
 cp /tmp/antlr3-task/antlr3-task/ant-antlr3.jar $ANTLR_HOME/ant-antlr3.jar
 rm -rf /tmp/antlr3-task /tmp/antlr3-task.zip
-ls $ANTLR_HOME
