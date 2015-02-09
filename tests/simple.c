@@ -4,9 +4,11 @@
 
 
 void kernel(int n, float A[static const restrict n]) {
+#pragma scop
 	for (int i = 0; i<n; ++i) {
 		A[i] = 0;
 	}
+#pragma endscop
 }
 
 static double get_time() {

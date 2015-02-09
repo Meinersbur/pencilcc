@@ -31,12 +31,15 @@ EXTRA_DIST = \
 	tests/simple/check.sh \
 	tests/simple/example.c
 
-TESTS = tests/simple/check.sh
+TESTS = \
+	tests/check-simple.sh \
+	tests/check-simple-keep.sh \
+	tests/check-simple-nativeexpr.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
 	export TESTSRCDIR="`dirname "$(abs_srcdir)/$${b}"`"; \
-	export TESTBUILDDIR="`dirname "$(abs_builddir)/$${b}"`/check"; \
+	export TESTBUILDDIR="`dirname "$(abs_builddir)/$${b}"`/check/`basename $${b}`"; \
 	$(MKDIR_P) "$${TESTBUILDDIR}";
 
 pencilcc: pencilcc.py
@@ -68,7 +71,7 @@ installcheck-local:
 	for test in ${TESTS}; do \
 		export PENCILCC="${bindir}/pencilcc"; \
 		export TESTSRCDIR="`dirname "$(abs_srcdir)/$${test}"`"; \
-		export TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`/installcheck"; \
+		export TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`/installcheck/`basename $${test}`"; \
 		$(MKDIR_P) "$${TESTBUILDDIR}"; \
 		echo "Checking `basename $${test}`..."; \
 		( cd "$${TESTBUILDDIR}" && "$(abs_srcdir)/$${test}") || exit 1; \

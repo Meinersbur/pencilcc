@@ -251,8 +251,8 @@ config = Configuration()
 
 
 
-def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None):
-	if print_commands:
+def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False):
+	if print_commands or force:
 		shortcmd = os.path.basename(cmd) if print_commands_baseonly else shlex.quote(cmd)
 		setenvs = []
 		if addenv is not None:
@@ -287,6 +287,8 @@ def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None):
 				env[key] = oldval + ':' + val
 			else:
 				env[key] = val
+	sys.stdout.flush()
+	sys.stderr.flush()
 	rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env)
 	if rtncode!=0:
 		exit(rtncode)
@@ -385,6 +387,7 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--version', action='store_true', help="Print versions of involved programs")
 	parser.add_argument('--noselfupdate', dest='selfupdate', action='store_false', default=True,
 		help="Do not try to update yourself" if is_build() else argparse.SUPPRESS)
+	parser.add_argument('--show-invocation', action='store_true', default=False, help="Print the command that invoked pencilcc")
 	parser.add_argument('--show-commands', action='store_true', default=False, help="Print executed commands")
 	parser.add_argument('--show-commands-baseonly', action='store_true', default=False, help="Do not print full command path")	
 	parser.add_argument('--pencil-config', choices=['system', 'build', 'install'], help="Introspection to use")
@@ -430,6 +433,7 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--no-isl-schedule-separate-components', action='store_true')
 	parser.add_argument('--isl-schedule-fuse', metavar='MINMAX')
 	parser.add_argument('--isl-schedule-max-coefficient', metavar='CEOFF')
+	parser.add_argument('--opencl-native-expr', action='store_true')
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
@@ -506,13 +510,17 @@ def main():
 	print_commands = (known.verbose > 0) or known.show_commands or known.show_commands_baseonly
 	print_commands_baseonly = known.show_commands_baseonly
 
+	if known.show_invocation:
+		print_command(*sys.argv,force=True)
+
 	# Re-configure the script automatically if in builddir
 	if known.selfupdate and is_build():
 		invoke('make', os.path.basename(script),cwd=os.path.dirname(script))
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
+		cmdline.remove('--show-invocation') # Do not show invocation a second time
 		invoke(*cmdline)
 		return
-	
+
 	global config
 	config = get_config_from_argparse(known, unknown)
 	if known.pencil_config=='system':
@@ -577,6 +585,8 @@ def main():
 		ppcgargs += ['--isl-schedule-fuse=' + known.isl_schedule_fuse]
 	if not known.isl_schedule_max_coefficient is None:
 		ppcgargs += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
+	if known.opencl_native_expr:
+		ppcgargs += ['--opencl-native-expr']
 
 	if known.std is None:
 		ccargs += ['-std=gnu99']
@@ -677,7 +687,7 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 		if isc:
 			if config.use_optimizer and ispencil:
 				if tmpdir is None:
-					subdir = dirname
+					subdir = '.'
 				else:
 					subdir = tempfile.mkdtemp(prefix='opt.', dir=tmpdir)
 					origdirref += ['-I', dirname] # To keep #including files from same directory working
@@ -696,7 +706,7 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 				ppcgargs = copy.copy(user_ppcgargs)
 				
 				if tmpdir is None:
-					subdir = dirname
+					subdir = '.'
 					outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
 				else:
 					subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
