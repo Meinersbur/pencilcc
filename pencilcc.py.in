@@ -434,6 +434,9 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--isl-schedule-fuse', metavar='MINMAX')
 	parser.add_argument('--isl-schedule-max-coefficient', metavar='CEOFF')
 	parser.add_argument('--opencl-native-expr', action='store_true')
+	parser.add_argument('--no-shared-memory', action='store_true')
+	parser.add_argument('--no-private-memory', action='store_true')
+	parser.add_argument('--sizes', metavar='SIZES')
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
@@ -517,7 +520,7 @@ def main():
 	if known.selfupdate and is_build():
 		invoke('make', os.path.basename(script),cwd=os.path.dirname(script))
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
-		cmdline.remove('--show-invocation') # Do not show invocation a second time
+		cmdline = [ x for x in cmdline if x !=  '--show-invocation'] # Do not show invocation a second time
 		invoke(*cmdline)
 		return
 
@@ -587,6 +590,12 @@ def main():
 		ppcgargs += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
 	if known.opencl_native_expr:
 		ppcgargs += ['--opencl-native-expr']
+	if known.no_shared_memory:
+		ppcgargs += ['--no-shared-memory']
+	if known.no_private_memory:
+		ppcgargs += ['--no-private-memory']
+	if not known.sizes is None:
+		ppcgargs += ['--sizes=' + known.sizes]
 
 	if known.std is None:
 		ccargs += ['-std=gnu99']
@@ -729,7 +738,7 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 				invoke_ppcg(*ppcgargs)
 				file = outfile
 				anyoptimized = True
-			
+
 		outfiles.append(file)
 		origdirrefs += origdirref
 
@@ -744,7 +753,10 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 			ccargs += config.ocl_utilities_cflags
 	else:
 		ccargs += user_cppflags
-	
+		ccargs += config.pencil_h_cppflags # Always add the include dir for pencil.h, it might be used in compatibility mode
+		if config.use_runtime:
+			ccargs += config.pencil_runtime_cppflags # Non-ppcg-generated code may still include pencil_runtime.h and call pencil_dump_stats()
+
 	ccargs += user_ccargs
 	ccargs += outfiles
 	

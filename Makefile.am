@@ -22,19 +22,19 @@ pkgdata_SCRIPTS = pencilcc.py
 
 CLEANFILES = pencilcc.py pencilcc
 
+TESTS = \
+	tests/check-simple.sh \
+	tests/check-simple-keep.sh \
+	tests/check-simple-nativeexpr.sh
+
 EXTRA_DIST = \
 	autogen.sh \
 	README.md \
 	examples \
 	get-scala.sh get-antlr3.sh get-polybench.sh \
 	scala antlr3 polybench \
-	tests/simple/check.sh \
-	tests/simple/example.c
-
-TESTS = \
-	tests/check-simple.sh \
-	tests/check-simple-keep.sh \
-	tests/check-simple-nativeexpr.sh
+	tests/simple.c \
+	${TESTS}
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
@@ -56,13 +56,13 @@ uninstall-local:
 
 # Dowload from the internet
 scala: get-scala.sh
-	./get-scala.sh
+	${srcdir}/get-scala.sh
 
 antlr3: get-antlr3.sh
-	./get-antlr3.sh
+	${srcdir}/get-antlr3.sh
 
 polybench: get-polybench.sh
-	./get-polybench.sh
+	${srcdir}/get-polybench.sh
 
 # Get the packages so they can be used by "make check"
 dist-local: scala antlr3 polybench
