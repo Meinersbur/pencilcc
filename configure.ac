@@ -2,12 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pencil-driver], [0.1], [carp-pencil@imperial.ac.uk])
+AC_INIT([pencil-driver], [0.2], [carp-pencil@imperial.ac.uk])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Automake
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([1.14 -Wall foreign tar-ustar])
+AM_INIT_AUTOMAKE([1.11 -Wall foreign tar-ustar])
 AM_MAINTAINER_MODE([enable])
 
 # Checks for programs.
@@ -17,7 +17,6 @@ PKG_PROG_PKG_CONFIG
 
 AX_DETECT_GIT_HEAD
 AC_SUBST(GIT_HEAD_ID)
-#echo '#define GIT_HEAD_ID "'$GIT_HEAD_ID'"' > gitversion.h
 
 
 dnl I there no official way yo get the build directory?

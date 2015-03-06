@@ -29,7 +29,7 @@ TESTS = \
 
 EXTRA_DIST = \
 	autogen.sh \
-	README.md \
+	README \
 	examples \
 	get-scala.sh get-antlr3.sh get-polybench.sh \
 	scala antlr3 polybench \
