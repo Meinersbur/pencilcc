@@ -1,0 +1,323 @@
+pencil-driver
+=============
+
+Driver for PENCIL compile toolchain.
+
+
+Requirements (might be incomplete)
+----------------------------------
+
+- C99 compiler (Tested with gcc 4.9.1)
+- automake, autoconf, libtool (Tested with version 2.69)
+- pkg-config (Tested with version 0.28)
+- ppcg (Bundled in ppcg submodule)
+  - Integer Set Library (Bundled in ppcg/isl submodule)
+    - GNU Bignum Library (Tested with version 6.0)
+  - PET (bundled in ppcg/pet submodule)
+    - Clang headers and libraries (Tested with version 3.5)
+- pencil-optimizer (Bundled in pencil submodule)
+  - Scala/scalac (Tested with version 2.10.4)
+  - Apache Ant (Tested with version 1.9.4)
+  - ANTLR3 (Tested with version 3.5.2)
+    - antlr3-task
+- pencil headers and runtime (Bundled in pencil-util submodule)
+  - C++11 compiler (Tested with g++ 4.9.1)
+- Python3 (Tested with version 3.4.2)
+- polybench (Tested with version 3.2)
+
+Scala, ANTLR3 and polybench in the aforementioned versions are also bundled in the distribution and used automatically if still there.
+
+
+Installation
+------------
+
+	./configure
+	make
+	sudo make install
+
+in the pencil-driver directory.  See './configure --help' for options.
+
+'make install' will install pencilcc, ppcg, pencil-optimizer, the headers pencil.h and prl.h, and the libprl.so library.
+
+
+Usage
+-----
+
+pencilcc is a compiler invocation replacement.  Replace your compiler call by pencilcc.  Call 'pencilcc --help' for options.  Every option not recognized is passed to the compiler (cc) after optimization took place.
+
+By default *.pencil.c and *.pencil files are assumed to contain pure PENCIL code (sublanguage of C99) and every other file C99 code with embedded PENCIL (#pragma scop/#pragma endscop).  There is currently no way to override this behaviour.  PENCIL files are optimized using pencil-optimizer and ppcg; embedded PENCIL files with ppcg only.
+
+Please note that CC=pencilcc (globally or by build utilitity) won't work; pencilcc uses this environment variable to determine which compiler to call and would potentially call itself.
+
+The directories example/plain and example/cext contain scripts (example.sh) that call pencilcc to demonstrate the behaviour.
+
+pencilcc has three configuration modes.
+
+`build`) Then executed from the build directory, it will use the files from the source-tree and build directory.  I.e., installation is not necessary.
+
+`install`) Use the path configured by --prefix to find the required tools and files.  Used by default when not started from the build directory.
+
+`system`) Uses no paths, but assumes that all files and tools are in the default search paths (e.g. /usr/bin, /usr/include, /usr/lib)
+
+Configuration modes can be changed explicitely using the --pencil-config command line option.
+
+
+Known Issues
+------------
+
+- pencilcc assumes the compiler accepts gcc command line syntax
+- pencilcc assumes the compiler invocation includes linking; i.e. the options -c (compile to .o) and -E (precompile) are not recognized 
+- Some warnings are unavoidable (e.g. unkonwn attribute)
+- ppcg --version reports UNKNOWN for its own version
+
+
+
+Future Features
+---------------
+
+- Run pencilcc as compile prefix (like libtool) instead of replacement (like mpicc)
+- Detect -c and -E (+ others) compile modes
+- Honor -x switch
+- Support for more non-cc (ppcg, pencil-optimizer) command line options
+
+
+
+Paris Runtime Library (pencil-util)
+===================================
+
+Has its own readme in 'pencil-util/runtime/README'.  However, I did not update it to my changes and might be out of date.
+
+Usage
+-----
+
+Either use pencilcc 
+ - or -
+add -lprl to the linker line.  When compiling, add 'pencil-util/include' AND 'pencil-util/runtime' to the header search path (or install them to the default header search path).
+
+In both cases, a call to
+
+	prl_init(PRL_TARGET_DEVICE_DYNAMIC)
+
+should be added to the program, before any PENCIL function is executed; And a call to
+
+	prl_finish()
+
+before the program ends.  Otherwise, OpenCL programs and allocation will not be cached, i.e. much worse performance.
+
+
+Profiling 
+---------
+
+This version of the runtime library can profile PENCIL programs automatically.  Not that this implementation is not really prepared to be used from multiple threads, although the library can be compiled with locking.
+
+
+### Ad-hoc Profiling (stats)
+
+
+This can be enabled by setting the environment variables
+
+	PRL_CPU_PROFILING=1
+	PRL_GPU_PROFILING=1
+
+(the value they are set to does not matter).
+
+	PRL_PROFLING=1
+
+sets both of them.  The will output statistics to stdout.  An example output is
+
+	===============================================================================
+	Non-blocking implementation
+	CPU:
+	Copy-to-device:    4.338 ms
+	Compute:           7.166 ms
+	Copy-to-host:      1.521 ms
+	Waiting:        1146.157 ms
+	Compilation:       1.564 ms
+	Overhead:         10.178 ms
+	Total:          1170.362 ms
+
+	GPU:
+	Copy-to-device:  462.605 ms
+	Compute:         219.210 ms
+	Copy-to-host:    253.909 ms
+	Idle:            253.909 ms
+	Working:         935.724 ms
+	Total:          1110.495 ms
+	===============================================================================
+
+(description of the values below)
+This will be output at the last 'prl_shutdown()' (reference counter falls to 0).  Without a user-added pair of prl_init() and prl_shutdown(), it is output after every exection of a SCoP/PENCIL function.
+
+The environment variable 
+
+	PRL_BLOCKING=1
+
+makes the runtime wait after every OpenCL operation until the GPU has finished its work.  The dump will then include the line
+
+	Blocking implementation
+
+The same output can be printed in the user's program by a call to 'prl_stats_dump()'.  Timings continue to be accumulated, so to start a new mesurement, the program can call prl_stats_reset() which will reset all counters to zero.
+
+When setting one of
+
+	PRL_PROFILING_PREFIX=
+	PRL_PREFIX=
+
+The lines containing a duration in milliseconds are prefixed with that string.  The intention is to allow a parser find these lines (e.g. grep) without getting confused with regular program outputs that look similar.
+
+
+### Benchmarking (timings)
+
+Profiling a single function call can be unreliable, therefore there is also a mechanism to measure a piece of code multiple times.  The easiest way to do this is to create a new program that call the function
+
+	prl_timings(timed_func, user, init_callback, init_user, finit_callback, finit_user)
+
+which does basically this:
+
+	prl_init(PRL_TARGET_DEVICE_DYNAMIC | PRL_PROFILING_ENABLED);
+	prl_timings_reset();
+
+	for (auto i = 0; i < PRL_DRY_RUNS; ++i) {
+		if (init_callback) (*init_callback)(init_user);
+		(*timed_func)(user);
+		if (finit_callback) (*finit_callback)(finit_user);
+	}
+
+	for (auto i = 0; i < PRL_RUNS; ++i) {
+		if (init_callback) (*init_callback)(init_user);
+		prl_timings_start();
+		(*timed_func)(user);
+		prl_timings_stop();
+		if (finit_callback) (*finit_callback)(finit_user);
+	}
+
+	prl_timings_dump();
+	prl_shutdown();
+
+
+PRL_RUNS and PRL_DRY_RUNS are environment variables that can be set.  The defaults are 2 for dry runs and 30 for timed runs.  Dry runs allow eliminating first-time effect like cold memory cashes and compiling the OpenCL program.
+
+This function already calls prl_init() and prl_shutdown(), so it is not strictly necessary to do this by programmer.  However, it is still possible and can make sense if there are multiple calls of prl_timings() in the program.  In this case, ensure that it is called with the PRL_PROFILING_ENABLED flag set (Or launch the program using PRL_PROFILING=1, but this will also print a dump with zero's only because nothing is executed between prl_timings_dump() and prl_shutdown())
+
+The execution time between 'prl_timings_start()' and 'prl_timings_stop()' is measured.  Since it is executed multiple times, it records the time of every execution.  The data is printed to stdout on 'prl_timings_dump()' which look like this:
+
+	===============================================================================
+	Non-blocking implementation
+	                         median (relative standard deviation) of 30 samples
+	Duration:              7.748 ms (±49.51%)
+	w/o compilation:       7.745 ms (±49.52%)
+
+	CPU_Copy-to-device:    0.000 ms (± 0.00%)
+	CPU_Compute:           0.007 ms (±22.87%)
+	CPU_Copy-to-host:      0.003 ms (±22.53%)
+	CPU_Waiting:           7.639 ms (±50.02%)
+	CPU_Compilation:       0.002 ms (±15.44%)
+	CPU_Init:              0.000 ms (± 0.00%)
+	CPU_Release:           0.000 ms (± 0.00%)
+	CPU_Alloc:             0.023 ms (±19.59%)
+	CPU_Free:              0.001 ms (±30.42%)
+	CPU_Overhead:          0.047 ms (±13.41%)
+	CPU_Total:             7.733 ms (±49.56%)
+
+	GPU_Copy-to-device:    0.000 ms (± 0.00%)
+	GPU_Compute:           6.699 ms (±54.43%)
+	GPU_Copy-to-host:      0.636 ms (±14.00%)
+	GPU_Idle:              0.021 ms (±26.47%)
+	GPU_Working:           7.337 ms (±51.45%)
+	GPU_Total:             7.358 ms (±51.34%)
+	===============================================================================
+
+For every line, the number in milliseconds is the median of all runs.  The second values in parenthesis are the relative standard deviation, i.e. the standard deviation relative to the arithmetic mean (average, NOT the median, as the output might suggest).  It is desirable to keep it below 5%.
+
+Again, the lines can be prefixed by setting one of the environment variables
+
+	PRL_TIMINGS_PREFIX=
+	PRL_PREFIX=
+
+It might not be possible to use the 'prl_timings' function in you application.  In this case, one can do it manually by following the structure of the prl_timings snippet.
+
+
+### Description of the profiling data
+
+- Duration
+  The timespan between 'prl_timings_start()' and 'prl_timings_stop()'
+  
+- w/o compilation
+  Same as duration, but 'CPU_Compilation' subtracted from it.  The rationale is that compilation only needs to be done once and can also be loaded again as binary, i.e. is irrelevant to the actual execution time.
+
+
+## CPU
+
+These values are measured using 'std::chrono::steady_clock' (btw, 'Duration' as well).  In most libprl library calls, it takes the current timestamp when entering and leaving the function.  The timespan between those is accumulated to one of the variables.
+
+- CPU_Copy-to-device
+  Calls to 'prl_copy_to_device'
+  Either calls the OpenCL functions 'clEnqueueWriteBuffer' or 'clEnqueueUnmapMemObject'
+
+- CPU_Compute
+  Calls to 'prl_launch_kernel'
+  Calls the OpenCL function 'clEnqueueNDRangeKernel'
+  
+- CPU_Copy-to-host
+  Calls to 'prl_copy_to_device'
+  Either calls the OpenCL functions 'clEnqueueReadBuffer' or 'clEnqueueMapMemObject'
+
+- CPU_Waiting
+  Time spent in 'clFinish'
+  Happens in innermost calls to 'prl_finish', when control leaves PENCIL code (or a SCoP) and therefore all data must be available to the CPU.
+
+- CPU_Compilation
+  Calls to 'prl_create_program_from_file' or 'prl_create_program_from_string'
+  Potentially calls the OpenCL functions 'clCreateProgramWithSource', 'clBuildProgram' and 'clGetProgramBuildInfo' (or take their results from the cache)
+
+- CPU_Init
+  First-time calls to 'prl_init'
+  Calls the OpenCL function 'clGetPlatformIDs', 'clGetDeviceIDs', 'clCreateContext' and 'clCreateCommandQueue'
+
+- CPU_Release
+  Finalizing calls of 'prl_shutdown'
+  Calls the OpenCL functions 'clReleaseCommandQueue' and 'clReleaseContext'
+
+- CPU_Alloc
+  Calls to 'prl_alloc' and 'prl_create_device_buffer'
+  Typically calls the OpenCL functions 'clCreateBuffer', 'clEnqueueMapBuffer' and/or 'clEnqueueUnmapMemObject'
+
+- CPU_Free
+  Calls to 'prl_free' and 'prl_release_buffer'
+  Typically calls the OpenCL functions 'clReleaseMemObject' or 'clEnqueueUnmapMemObject'
+
+- CPU_Overhead
+  Everything not belonging to one of the other categories (collecting and evaluating OpenCL profiling, 'prl_release_program' which does nothing, 'prl_create_kernel', 'prl_set_kernel_arg')
+  Includes calls to the OpenCL functions 'clCreateKernel', 'clSetKernelArg', 'clGetEventProfilingInfo' and 'clGetEventInfo'
+
+- CPU_Total
+  Sum of all 'CPU_' values
+  
+The /Duration/ also include the time not spent in libprl, i.e. must be larger that /CPU_Total/.  The latter also does NOT include time on computations in which ppcg did not find sufficient parallelism and generated CPU code.  Such code does not call any functions from libprl and hence cannot be timed by it.
+
+
+## GPU
+
+This data is callected using OpenCL's profiling facility, i.e. using the CL_QUEUE_PROFILING_ENABLE flag.  It makes the GPU annotate every job with its start- and end-timestamp.
+
+- GPU_Copy-to-device
+  clEnqueueWriteBuffer and clEnqueueUnmapMemObject
+
+- GPU_Compute
+  clEnqueueNDRangeKernel
+
+- GPU_Copy-to-host
+  clEnqueueReadBuffer and clEnqueueMapMemObject
+
+- GPU_Idle
+  The portion of GPU_Total the GPU is not occupied with any job
+
+- GPU_Working
+  The portion of GPU_Total the GPU is doing at least one job
+
+- GPU_Total
+  Time between the start of the first command queue item and the end of the last item (should be sum of GPU_Idle and GPU_Working)
+
+GPU_Working is not necessarily the sum of GPU_Copy-to-device, GPU_Compute and GPU_Copy-to-host because jobs can theoretically overlap.  libprl uses an in-order queue, but the OpenCL driver might still analyse the dependencies of the jobs and run non-dependent jobs at the same time.
+
+We do not use the timestamps from CL_PROFILING_COMMAND_QUEUED and CL_PROFILING_COMMAND_SUBMIT.  The are typically annotated using a timestamp from the CPU and the CPU's and GPU's clock are not necessarily synchronized.
