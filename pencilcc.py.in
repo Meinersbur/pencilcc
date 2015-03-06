@@ -251,7 +251,7 @@ config = Configuration()
 
 
 
-def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False):
+def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,prefix='$ '):
 	if print_commands or force:
 		shortcmd = os.path.basename(cmd) if print_commands_baseonly else shlex.quote(cmd)
 		setenvs = []
@@ -267,11 +267,11 @@ def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False):
 		for elt in setenvs:
 			setenv += elt + ' '
 		if cwd is None:
-			print('$ ' + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]),file=sys.stderr)
+			print(prefix + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]),file=sys.stderr)
 		else:
-			print('$ (cd ' + shlex.quote(cwd) + ' && ' + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]) + ')',file=sys.stderr)
+			print(prefix + '(cd ' + shlex.quote(cwd) + ' && ' + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]) + ')',file=sys.stderr)
 
-def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None):
+def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False):
 	print_command(cmd, *args,cwd=cwd,addenv=addenv,appendenv=appendenv)
 	env=None
 	if addenv is not None or appendenv is not None:
@@ -289,14 +289,15 @@ def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None):
 				env[key] = val
 	sys.stdout.flush()
 	sys.stderr.flush()
-	rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env)
-	if rtncode!=0:
-		exit(rtncode)
+	if not showonly:
+		rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env)
+		if rtncode!=0:
+			exit(rtncode)
 
 
 def verbosity(lvl):
 	if lvl > 0:
-		return ['-' + 'v'.repeat(lvl)]
+		return ['-' + 'v' * lvl]
 	return []
 
 
@@ -400,7 +401,9 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--pencilc-exts', metavar='SUFFIXES', action='append', help="Extension of files treated as C with PENCIL as extention (default: .c)")
 	
 	parser.add_argument('--pencil-cpp-path', metavar='CPP', help="Path to preprocessor (default: " + defaultcfg.cpp_prog + ")")
-	
+
+	parser.add_argument('--pencil-output', choices=['opt', 'ppcg'],  help='Stop after this tool instead the entire toolchain (default: ld)')
+
 	parser.add_argument('--pencil-opt', action='store_true', default=None,
 		help="Use pencil-optimizer in toolchain" if not defaultcfg.use_optimizer and with_pencil!='no' else argparse.SUPPRESS)
 	parser.add_argument('--pencil-noopt', action='store_true', default=None,
@@ -437,6 +440,7 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--no-shared-memory', action='store_true')
 	parser.add_argument('--no-private-memory', action='store_true')
 	parser.add_argument('--sizes', metavar='SIZES')
+	parser.add_argument('--dump-sizes', action='store_true')
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
@@ -480,7 +484,7 @@ def get_config_from_argparse(known, unkown):
 		config.use_ppcg = True
 		config.ppcg_prog = known.pencil_ppcg_path
 		
-	if known.pencil_noopt is not None:
+	if known.pencil_noppcg is not None:
 		config.use_ppcg = False
 	config.ppcg_verbose = max(0, known.verbose - 1)
 		
@@ -596,38 +600,40 @@ def main():
 		ppcgargs += ['--no-private-memory']
 	if not known.sizes is None:
 		ppcgargs += ['--sizes=' + known.sizes]
+	if known.dump_sizes:
+		ppcgargs += ['--dump-sizes']
 
 	if known.std is None:
 		ccargs += ['-std=gnu99']
 	else:
 		ccargs += ['-std=' + known.std]
-	
+
 	if known.keep:
-		compile(files, user_cppflags, ppcgargs, ccargs, None, known.o)
+		compile(files, user_cppflags, ppcgargs, ccargs, None, known.o, known.pencil_output)
 	elif known.pencil_tmpdir:
 		tmpdir = known.pencil_tmpdir
 		if os.path.isdir(tmpdir):
 			# Do not delete directories we did not create
-			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o)
+			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o, known.pencil_output)
 		else:
 			os.makedirs(tmpdir)
-			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o)
+			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o, known.pencil_output)
 			if not known.keep_tmp:
 				shutil.rmtree(tmpdir)
 	elif known.keep_tmp:
 		tmpdir = tempfile.mkdtemp(prefix='pencil.')
-		compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o)
+		compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o, known.pencil_output)
 	else:
 		with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
-			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o)
-			
+			compile(files, user_cppflags, ppcgargs, ccargs, tmpdir, known.o, known.pencil_output)
+
 	if known.run:
 		execfilename = 'a.out'
 		if known.o is not None:
 			execfilename = known.o
 		if not os.path.isabs(execfilename):
 			execfilename = './' + execfilename
-			
+
 		runtime_lflags = []
 		runtime_lflags += config.common_lflags
 		if config.optruntime:
@@ -677,7 +683,7 @@ def has_ext(filename, suffixes):
 	return False
 
 
-def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
+def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output, mode):
 	global config
 
 	outfiles = []
@@ -692,7 +698,7 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 		ispencil = isc and optext
 		file = infile
 		origdirref = []
-		
+
 		if isc:
 			if config.use_optimizer and ispencil:
 				if tmpdir is None:
@@ -701,29 +707,46 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 					subdir = tempfile.mkdtemp(prefix='opt.', dir=tmpdir)
 					origdirref += ['-I', dirname] # To keep #including files from same directory working
 				cppfile = os.path.join(subdir, rootname + '.cpp' + ext)
-				optfile = os.path.join(subdir, rootname + '.opt' + ext)
+				
+				if mode=='opt':
+					if output is None:
+						optfile=None
+						#optfile = os.path.join(subdir, rootname + '.opt' + ext)
+					else:
+						optfile = output # TODO: Check if we process multiple files which would overwrite the previous
+				else:
+					optfile = os.path.join(subdir, rootname + '.opt' + ext)
 
 				cppargs = []
 				cppargs += get_cppflags(1, user_cppflags)
 				cppargs += ['-P', file, '-o', cppfile]
 				invoke_cpp(*cppargs)
 
-				invoke_optimizer(cppfile,'-o',optfile)
+				optargs = [cppfile]
+				if optfile:
+					optargs+=['-o',optfile]
+				invoke_optimizer(*optargs)
 				file = optfile
-			
-			if config.use_ppcg:
+
+			if config.use_ppcg and mode!='opt':
 				ppcgargs = copy.copy(user_ppcgargs)
-				
-				if tmpdir is None:
-					subdir = '.'
-					outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
-				else:
-					subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
-					outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
-					if origdirref:
-						ppcgargs += origdirref
+
+				if mode=='ppcg':
+					if output is None:
+						outfile = None
 					else:
-						origdirref = ['-I', dirname]
+						outfile = output # TODO: Check if we process multiple files which would overwrite the previous
+				else:
+					if tmpdir is None:
+						subdir = '.'
+						outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
+					else:
+						subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
+						outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
+						if origdirref:
+							ppcgargs += origdirref
+						else:
+							origdirref = ['-I', dirname]
 
 				ppcgargs += get_cppflags(2, user_cppflags)
 				ppcgargs += ['--target=opencl']
@@ -734,13 +757,18 @@ def compile(files, user_cppflags, user_ppcgargs, user_ccargs, tmpdir, output):
 				if tmpdir is not None:
 					ppcgargs += ['--opencl-embed-kernel-code']
 				ppcgargs += config.pencil_opencl_ppcgflags
-				ppcgargs += [file, '-o', outfile]
+				ppcgargs += [file]
+				if outfile:
+					ppcgargs += ['-o', outfile]
 				invoke_ppcg(*ppcgargs)
 				file = outfile
 				anyoptimized = True
 
 		outfiles.append(file)
 		origdirrefs += origdirref
+	
+	if mode=='opt' or mode=='ppcg':
+		return
 
 	ccargs = []
 	if anyoptimized:
