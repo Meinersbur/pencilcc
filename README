@@ -127,25 +127,27 @@ sets both of them.  The will output statistics to stdout.  An example output is
 
 	===============================================================================
 	Non-blocking implementation
-	CPU:
-	Copy-to-device:    4.338 ms
-	Compute:           7.166 ms
-	Copy-to-host:      1.521 ms
-	Waiting:        1146.157 ms
-	Compilation:       1.564 ms
-	Overhead:         10.178 ms
-	Total:          1170.362 ms
+	CPU_Copy-to-device:    0.000 ms
+	CPU_Compute:           0.035 ms
+	CPU_Copy-to-host:      0.009 ms
+	CPU_Waiting:           3.915 ms
+	CPU_Compilation:      39.216 ms
+	CPU_Init:              8.458 ms
+	CPU_Release:           0.304 ms
+	CPU_Alloc:             0.020 ms
+	CPU_Free:              0.001 ms
+	CPU_Overhead:          0.203 ms
+	CPU_Total:            52.160 ms
 
-	GPU:
-	Copy-to-device:  462.605 ms
-	Compute:         219.210 ms
-	Copy-to-host:    253.909 ms
-	Idle:            253.909 ms
-	Working:         935.724 ms
-	Total:          1110.495 ms
+	GPU_Copy-to-device:    0.000 ms
+	GPU_Compute:           2.756 ms
+	GPU_Copy-to-host:      1.114 ms
+	GPU_Idle:              0.011 ms
+	GPU_Working:           3.870 ms
+	GPU_Total:             3.881 ms
 	===============================================================================
 
-(description of the values below)
+(description of the values at the bottom)
 This will be output at the last 'prl_shutdown()' (reference counter falls to 0).  Without a user-added pair of prl_init() and prl_shutdown(), it is output after every exection of a SCoP/PENCIL function.
 
 The environment variable 
@@ -168,7 +170,7 @@ The lines containing a duration in milliseconds are prefixed with that string.  
 
 ### Benchmarking (timings)
 
-Profiling a single function call can be unreliable, therefore there is also a mechanism to measure a piece of code multiple times.  The easiest way to do this is to create a new program that call the function
+Profiling a single function call can be unreliable do to noise and one-time effects.  Therefore there is also a mechanism to measure a piece of code multiple times.  The easiest way to do this is to create a new program that call the function
 
 	prl_timings(timed_func, user, init_callback, init_user, finit_callback, finit_user)
 
