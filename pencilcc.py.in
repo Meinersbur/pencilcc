@@ -434,6 +434,8 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--target', metavar='TARGET', choices=['opencl'], help=argparse.SUPPRESS)
 	parser.add_argument('--no-opencl-print-kernel-types', action='store_true', help=argparse.SUPPRESS)
 	
+	parser.add_argument('--isl-schedule-fuse-override', metavar='MINMAX', choices=['min', 'max'], help=argparse.SUPPRESS)
+	
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
 	parser.add_argument('-std', metavar='STD', choices=['gnu99', 'c99'], 
@@ -581,8 +583,13 @@ def main():
 		ppcgargs += ['--opencl-include-file=' + incfile]
 	if known.no_isl_schedule_separate_components:
 		ppcgargs += ['--no-isl-schedule-separate-components']
+	fuse=None
 	if not known.isl_schedule_fuse is None:
-		ppcgargs += ['--isl-schedule-fuse=' + known.isl_schedule_fuse]
+		fuse = known.isl_schedule_fuse
+	if not known.isl_schedule_fuse_override is None:
+		fuse = known.isl_schedule_fuse_override
+	if fuse is not None:
+		ppcgargs += ['--isl-schedule-fuse=' + fuse]
 	if not known.isl_schedule_max_coefficient is None:
 		ppcgargs += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
 	if known.opencl_native_expr:
