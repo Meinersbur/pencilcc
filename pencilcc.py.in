@@ -433,6 +433,8 @@ def parsecmd(defaultcfg):
 	parser.add_argument('--dump-sizes', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('--target', metavar='TARGET', choices=['opencl'], help=argparse.SUPPRESS)
 	parser.add_argument('--no-opencl-print-kernel-types', action='store_true', help=argparse.SUPPRESS)
+	parser.add_argument('--no-schedule-whole-component', action='store_true', help=argparse.SUPPRESS)
+	parser.add_argument('--schedule-maximize-coincidence', action='store_true', help=argparse.SUPPRESS)
 	
 	parser.add_argument('--isl-schedule-fuse-override', metavar='MINMAX', choices=['min', 'max'], help=argparse.SUPPRESS)
 	
@@ -604,6 +606,10 @@ def main():
 		ppcgargs += ['--dump-sizes']
 	if known.no_opencl_print_kernel_types:
 		ppcgargs += ['--no-opencl-print-kernel-types']
+	if known.no_schedule_whole_component:
+		ppcgargs += ['--no-schedule-whole-component']
+	if known.schedule_maximize_coincidence:
+		ppcgargs += ['--schedule-maximize-coincidence']
 
 	if known.std is None:
 		ccargs += ['-std=gnu99']
