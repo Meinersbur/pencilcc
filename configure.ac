@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pencil-driver], [0.2], [carp-pencil@imperial.ac.uk])
+AC_INIT([pencil-driver], [0.3], [carp-pencil@imperial.ac.uk])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Automake
