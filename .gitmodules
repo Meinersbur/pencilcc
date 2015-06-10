@@ -5,5 +5,5 @@
 	path = pencil
 	url = git@github.com:Meinersbur/pencil.git
 [submodule "pencil-util"]
-	path = pencil-util
+	path = prl
 	url = https://github.com/Meinersbur/pencil-util.git
