@@ -11,7 +11,7 @@ if BUNDLED_PPCG
 SUBDIRS += ppcg
 endif
 if BUNDLED_PENCIL_UTIL
-SUBDIRS += pencil_util
+SUBDIRS += pencil-util
 endif
 if BUNDLED_PRL
 SUBDIRS += prl
