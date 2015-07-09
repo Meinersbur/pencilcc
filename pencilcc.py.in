@@ -18,8 +18,8 @@ prefix='''@prefix@'''
 exec_prefix='''@exec_prefix@'''.replace('''${prefix}''', prefix)
 
 with_ppcg='''@with_ppcg@'''
-with_pencil='''@with_pencil@'''
 with_pencil_util='''@with_pencil_util@'''
+with_prl='''@with_pencil_util@'''
 
 abs_srcdir='''@abs_srcdir@'''
 abs_builddir='''@abs_builddir@'''
@@ -83,12 +83,12 @@ class Configuration:
 		self.cc_prog = os.environ.get('CC') or 'cc'
 		self.cc_flags = [] # shlex.split(os.environ.get('CFLAGS') or '')
 		self.cc_verbose = 0
-		
+
 		self.use_optimizer = True
 		self.optimizer_prog = 'pencil-optimizer'
 		self.optimizer_flags = []
 		self.optimizer_verbose = 0
-		
+
 		self.use_ppcg = True
 		self.ppcg_prog = 'ppcg'
 		self.ppcg_flags = []
@@ -96,7 +96,7 @@ class Configuration:
 		
 		self.pencil_h_cppflags = []
 		self.pencil_opencl_ppcgflags = ['--opencl-include-file=pencil_opencl.h']
-		
+
 		self.ocl_utilities_cflags = []
 		self.ocl_utilities_cppflags = []
 
@@ -123,7 +123,7 @@ class Configuration:
 			self.ppcg_prog = os.path.join(PPCG_BUILDDIR,'ppcg')
 			self.ocl_utilities_cppflags =  ['-I', PPCG_SRCDIR]
 			self.ocl_utilities_cflags = [os.path.join(PPCG_SRCDIR,'ocl_utilities.c')]
-	
+
 		if with_pencil=='no':
 			self.use_optimizer = False
 			self.optimizer_prog = ''

@@ -2,13 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pencil-driver], [0.3], [carp-pencil@imperial.ac.uk])
+AC_INIT([pencilcc], [0.4], [pencilcc@meinersbur.de])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Automake
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([1.11 -Wall foreign tar-ustar])
-AM_MAINTAINER_MODE([enable])
 
 # Checks for programs.
 AC_PROG_CPP
@@ -19,10 +18,9 @@ AX_DETECT_GIT_HEAD
 AC_SUBST(GIT_HEAD_ID)
 
 
-dnl I there no official way yo get the build directory?
+dnl Is there no official way yo get the build directory?
 abs_builddir=`pwd` # ${ac_abs_builddir} 
 abs_srcdir=$(readlink -m "${srcdir}")
-
 AC_SUBST(abs_builddir)
 AC_SUBST(abs_srcdir)
 
@@ -56,50 +54,6 @@ esac
 AM_CONDITIONAL(BUNDLED_PPCG, test "x$with_ppcg" = xbundled)
 
 
-
-AC_SUBST(PENCIL_BUILDDIR)
-AC_SUBST(PENCIL_SRCDIR)
-AC_SUBST(with_pencil)
-AX_SUBMODULE(pencil,no|build|bundled|system|no,bundled)
-case "$with_pencil" in
-no)
-	;;
-bundled)
-	PENCIL_BUILDDIR="${abs_builddir}/pencil"
-	PENCIL_SRCDIR="${abs_srcdir}/pencil"
-	;;
-build)
-	PENCIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_builddir/config.status --file=-`
-	PENCIL_SRCDIR=`echo @abs_srcdir@ | $with_pencil_builddir/config.status --file=-`
-	;;
-system)
-	;;
-esac
-AM_CONDITIONAL(BUNDLED_PENCIL, test "x$with_pencil" = xbundled)
-
-dnl Prefer manually downloaded Scala+Antlr3 over autodetected
-if test -f "${abs_srcdir}/scala/lib/scala-compiler.jar"; then
-	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-compiler.jar"
-fi
-if test -f "${abs_srcdir}/scala/lib/scala-library.jar"; then
-	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-library.jar"
-fi
-if test -f "${abs_srcdir}/scala/lib/scala-reflect.jar"; then
-	CLASSPATH="${CLASSPATH}:${abs_srcdir}/scala/lib/scala-reflect.jar"
-fi
-if test -f "${abs_srcdir}/antlr3/antlr3.jar"; then
-	CLASSPATH="${CLASSPATH}:${abs_srcdir}/antlr3/antlr3.jar"
-fi
-if test -f "${abs_srcdir}/antlr3/ant-antlr3.jar"; then
-	CLASSPATH="${CLASSPATH}:${abs_srcdir}/antlr3/ant-antlr3.jar"
-fi
-if test -f "${abs_srcdir}/scala/bin/scala"; then
-	subconfigure_addargs="${subconfigure_addargs} SCALA=${abs_srcdir}/scala/bin/scala"
-fi
-if test -f "${abs_srcdir}/scala/bin/scaladoc"; then
-	subconfigure_addargs="${subconfigure_addargs} SCALADOC=${abs_srcdir}/scala/bin/scaladoc"
-fi
-
 AC_SUBST(PENCIL_UTIL_BUILDDIR)
 AC_SUBST(PENCIL_UTIL_SRCDIR)
 AC_SUBST(with_pencil_util)
@@ -120,6 +74,28 @@ system)
 	;;
 esac
 AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_util" = xbundled)
+
+
+AC_SUBST(PRL_BUILDDIR)
+AC_SUBST(PRL_SRCDIR)
+AC_SUBST(with_prl)
+AX_SUBMODULE(prl,no|build|bundled|system|no,bundled)
+case "$with_pencil_util" in
+no)
+	;;
+bundled)
+	PRL_BUILDDIR="${abs_builddir}/prl"
+	PRL_SRCDIR="${abs_srcdir}/prl"
+	subconfigure_addargs="${subconfigure_addargs} --with-prl=build --with-prl-builddir=${PRL_BUILDDIR}" # Will overwrite inherited --with-pencil=bundled argument
+	;;
+build)
+	PRL_BUILDDIR=`echo @abs_builddir@ | $with_prl_builddir/config.status --file=-`
+	PRL_SRCDIR=`echo @abs_srcdir@ | $with_prl_builddir/config.status --file=-`
+	;;
+system)
+	;;
+esac
+AM_CONDITIONAL(BUNDLED_PRL, test x"$with_prl" = xbundled)
 
 
 
@@ -143,26 +119,27 @@ AC_ARG_WITH(polybench,
 		fi
 	]
 	)
-
 AC_MSG_RESULT(${with_polybench_result})
+
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
 AC_CONFIG_FILES([Makefile])
 
-if test x"$with_pencil_util" = xbundled; then
-	AC_CONFIG_SUBDIRS(pencil-util)
-fi
+
 if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
 fi
-if test x"$with_pencil" = xbundled; then
-	AC_CONFIG_SUBDIRS(pencil)
+if test x"$with_pencil_util" = xbundled; then
+	AC_CONFIG_SUBDIRS(pencil-util)
+fi
+if test x"$with_prl" = xbundled; then
+	AC_CONFIG_SUBDIRS(prl)
 fi
 
 AC_CONFIG_COMMANDS_POST([
 	dnl pass on arguments to subdir configures, but don't
 	dnl add them to config.status
-	ac_configure_args="${ac_configure_args} CLASSPATH=${CLASSPATH} ${subconfigure_addargs}" 
+	ac_configure_args="${ac_configure_args} ${subconfigure_addargs}"
 ])
 AC_OUTPUT

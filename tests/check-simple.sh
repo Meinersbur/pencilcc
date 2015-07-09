@@ -1,7 +1,7 @@
 #! /bin/sh
 set -e # Fail if any subcommand fails
 
-echo "pwd: `pwd`"
+echo "pwd=`pwd`"
 echo "PENCILCC=${PENCILCC}"
 echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"

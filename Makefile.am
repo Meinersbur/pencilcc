@@ -6,17 +6,16 @@ ACLOCAL_AMFLAGS = -I m4
 #AM_DISTCHECK_CONFIGURE_FLAGS = --with-clang=system
 
 
-if BUNDLED_PENCIL_UTIL
-MAYBE_PENCIL_UTIL = pencil-util
-endif
+SUBDIRS =
 if BUNDLED_PPCG
-MAYBE_PPCG = ppcg
+SUBDIRS += ppcg
 endif
-if BUNDLED_PENCIL
-MAYBE_PENCIL = pencil
+if BUNDLED_PENCIL_UTIL
+SUBDIRS += pencil_util
 endif
-
-SUBDIRS = $(MAYBE_PENCIL_UTIL) $(MAYBE_PPCG) $(MAYBE_PENCIL) 
+if BUNDLED_PRL
+SUBDIRS += prl
+endif
 
 pkgdata_SCRIPTS = pencilcc.py
 
@@ -33,8 +32,7 @@ EXTRA_DIST = \
 	examples \
 	get-scala.sh get-antlr3.sh get-polybench.sh \
 	scala antlr3 polybench \
-	tests/simple.c \
-	${TESTS}
+	tests/simple.c
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
