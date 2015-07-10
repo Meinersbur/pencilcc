@@ -24,7 +24,9 @@ CLEANFILES = pencilcc.py pencilcc
 TESTS = \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
-	tests/check-simple-nativeexpr.sh
+	tests/check-prl_alloc.sh \
+	tests/check-prl_manage.sh \
+	tests/check-prl_manage_host.sh
 
 EXTRA_DIST = \
 	autogen.sh \

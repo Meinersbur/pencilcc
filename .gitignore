@@ -39,3 +39,7 @@
 
 # Merging
 *.orig
+
+# KDevelop
+.kdef4/
+*.kdev4

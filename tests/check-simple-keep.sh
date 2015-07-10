@@ -7,4 +7,4 @@ echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
-${PENCILCC} --show-invocation --show-commands --keep "${TESTSRCDIR}/simple.c"  --run || exit 1
+${PENCILCC} -vv -g -O0 --keep "${TESTSRCDIR}/simple.c"  --run || exit 1

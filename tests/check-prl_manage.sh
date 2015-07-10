@@ -7,4 +7,4 @@ echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
-${PENCILCC} -vv -O3 "${TESTSRCDIR}/simple.c" --run
+${PENCILCC} -vv -O3 "${TESTSRCDIR}/prl_manage.c" --run
