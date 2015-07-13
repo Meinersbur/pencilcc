@@ -420,6 +420,7 @@ def parsecmd(defaultcfg, is_tool):
 		known.pencil_cc_args = []
 		known.pet_autodetect = None
 	else:
+		known.cc = None
 		known.cc_args = unknown
 		known.ppcg_args = []
 
@@ -434,7 +435,9 @@ def get_config_from_argparse(known):
 		config.ppcg_prog = known.pencil_ppcg_path
 	config.ppcg_verbose = max(0, known.verbose - 1)
 
-	if known.pencil_cc is not None:
+	if known.cc is not None:
+		config.cc_prog = known.cc
+	elif known.pencil_cc is not None:
 		config.cc_prog = known.pencil_cc
 	config.cc_verbose = max(0, known.verbose - 1)
 
