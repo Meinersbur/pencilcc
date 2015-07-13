@@ -1,0 +1,95 @@
+#!/bin/sh
+set -e # Fail if any subcommand fails
+
+verbose=no
+
+for option; do
+	case "$option" in
+		--verbose)
+			verbose=yes
+			;;
+	esac
+done
+alloptions="$@"
+
+EXEEXT=@EXEEXT@
+DIR=@POLYBENCH_DIR@
+VERSION=@GIT_HEAD_ID@
+SIZE=-DMINI_DATASET
+CC="@CC@"
+PRL_SRCDIR=@PRL_SRCDIR@
+PRL_BUILDDIR=@PRL_BUILDDIR@
+
+CPPFLAGS="-DPOLYBENCH_USE_C99_PROTO -DPOLYBENCH_DUMP_ARRAYS"
+CPPFLAGS="$CPPFLAGS $SIZE -I $DIR/utilities"
+CFLAGS="-lm -std=gnu99"
+
+if [ -z "${TESTBUILDDIR}" ]; then
+	OUTDIR=./tests/polybench
+else
+	OUTDIR="${TESTBUILDDIR}"
+
+fi
+echo "Running tests in folder ${OUTDIR}"
+mkdir -p "${OUTDIR}"
+
+if [ -z "${PENCILCC}" ]; then
+	PENCILCC=pencilcc
+fi
+
+run_tests () {
+	ext=$1
+
+	ppcg_options=$2
+	cc_options=$3
+
+	if [ "x$ppcg_options" = "x" ]; then
+		ppcg_option_str="none"
+	else
+		ppcg_option_str=$ppcg_options
+	fi
+
+	if [ "x$cc_options" = "x" ]; then
+		cc_option_str="none"
+	else
+		cc_option_str=$cc_options
+	fi
+
+	echo Test: $ext, ppcg options: $ppcg_option_str, CC options: $cc_option_str
+	for i in `cat $DIR/utilities/benchmark_list`; do
+		echo $i
+		name=`basename $i`
+		name=${name%.c}
+		source_opt="${OUTDIR}/$name.$ext.c"
+		prog_orig=${OUTDIR}/$name.orig${EXEEXT}
+		prog_opt=${OUTDIR}/$name.$ext${EXEEXT}
+		output_orig=${OUTDIR}/$name.orig.out
+		output_opt=${OUTDIR}/$name.$ext.out
+		dir=`dirname $i`
+
+		$CC -I $DIR/$dir $CPPFLAGS $DIR/$i -o $prog_orig \
+			$DIR/utilities/polybench.c $CFLAGS
+		$prog_orig 2> $output_orig
+
+		if [ $verbose = "yes" ]; then
+			echo ${PENCILCC} \
+			"$DIR/$i" "$DIR/utilities/polybench.c" \
+			-I "$DIR/$dir" $CPPFLAGS $CFLAGS $cc_options $ppcg_options $pencil_options $alloptions \
+			-o $prog_opt
+		fi
+		${PENCILCC} \
+			"$DIR/$i" "$DIR/utilities/polybench.c" \
+			-I "$DIR/$dir" $CPPFLAGS $CFLAGS $cc_options $ppcg_options $pencil_options $alloptions \
+			-o $prog_opt || exit
+
+		if [ $verbose = "yes" ]; then
+			echo $prog_opt
+			LD_LIBRARY_PATH=`${PENCILCC} --show-run-var=LD_LIBRARY_PATH --noselfupdate` $prog_opt 2>&1 | tee $output_opt
+		else
+			LD_LIBRARY_PATH=`${PENCILCC} --show-run-var=LD_LIBRARY_PATH --noselfupdate` $prog_opt 2> $output_opt
+		fi
+		cmp $output_orig $output_opt || exit
+	done
+}
+
+run_tests ppcg_prl "--target=prl" "-g -O0 -I${PRL_INCLUDE_DIR}/include -L${PRL_BUILDDIR}/src/.libs -lprl_opencl -lOpenCL -lm"

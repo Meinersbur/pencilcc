@@ -378,7 +378,7 @@ def parsecmd(defaultcfg, is_tool):
 		parser.add_argument('--no-private-memory', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--sizes', metavar='SIZES', help=argparse.SUPPRESS)
 		parser.add_argument('--dump-sizes', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--target', metavar='TARGET', choices=['opencl'], help=argparse.SUPPRESS)
+		parser.add_argument('--target', metavar='TARGET', choices=['opencl', 'prl'], help=argparse.SUPPRESS)
 		parser.add_argument('--no-opencl-print-kernel-types', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--no-schedule-whole-component', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--schedule-maximize-coincidence', action='store_true', help=argparse.SUPPRESS)
@@ -422,6 +422,12 @@ def get_config_from_argparse(known):
 	if known.pencil_cc is not None:
 		config.cc_prog = known.pencil_cc
 	config.cc_verbose = max(0, known.verbose - 1)
+
+	if known.target is not None:
+		if known.target == 'prl':
+			config.use_prl = True
+		elif known.target == 'opencl':
+			config.use_prl = False
 
 	return config
 

@@ -22,6 +22,7 @@ pkgdata_SCRIPTS = pencilcc.py
 CLEANFILES = pencilcc.py pencilcc
 
 TESTS = \
+	tests/polybench_test.sh \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
 	tests/check-prl_alloc.sh \
@@ -32,9 +33,17 @@ EXTRA_DIST = \
 	autogen.sh \
 	README \
 	examples \
-	get-scala.sh get-antlr3.sh get-polybench.sh \
-	scala antlr3 polybench \
-	tests/simple.c
+	get-polybench.sh \
+	polybench \
+	tests/simple.c \
+	tests/check-simple.sh \
+	tests/check-simple-keep.sh \
+	tests/prl_alloc.c \
+	tests/check-prl_alloc.sh \
+	tests/prl_manage.c \
+	tests/check-prl_manage.sh \
+	tests/prl_manage_host.c \
+	tests/check-prl_manage_host.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
@@ -55,30 +64,24 @@ uninstall-local:
 
 
 # Dowload from the internet
-scala: get-scala.sh
-	${srcdir}/get-scala.sh
-
-antlr3: get-antlr3.sh
-	${srcdir}/get-antlr3.sh
-
 polybench: get-polybench.sh
 	${srcdir}/get-polybench.sh
 
 # Get the packages so they can be used by "make check"
-dist-local: scala antlr3 polybench
+dist-local: polybench
 
 installcheck-local:
-	for test in ${TESTS}; do \
+	@for test in ${TESTS}; do \
 		export PENCILCC="${bindir}/pencilcc"; \
 		export TESTSRCDIR="`dirname "$(abs_srcdir)/$${test}"`"; \
 		export TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`/installcheck/`basename $${test}`"; \
 		$(MKDIR_P) "$${TESTBUILDDIR}"; \
-		echo "Checking `basename $${test}`..."; \
-		( cd "$${TESTBUILDDIR}" && "$(abs_srcdir)/$${test}") || exit 1; \
+		echo "Checking `basename $${test}` ..."; \
+		( cd "$${TESTBUILDDIR}" && if test -f "$(abs_builddir)/$${test}"; then "$(abs_builddir)/$${test}"; else "$(abs_srcdir)/$${test}"; fi) || exit 1; \
 	done
 
 clean-local:
-	for test in ${TESTS}; do \
+	@for test in ${TESTS}; do \
 		TESTBUILDDIR="`dirname "$(abs_builddir)/$${test}"`"; \
 		rm -rf "$${TESTBUILDDIR}/check"; \
 		rm -rf "$${TESTBUILDDIR}/installcheck"; \

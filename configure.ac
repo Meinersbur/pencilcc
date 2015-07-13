@@ -100,6 +100,7 @@ AM_CONDITIONAL(BUNDLED_PRL, test x"$with_prl" = xbundled)
 
 
 AC_MSG_CHECKING([for PolyBench])
+AC_SUBST(POLYBENCH_DIR)
 AC_ARG_WITH(polybench,
 	[AS_HELP_STRING([--with-polybench=DIR],[PolyBench's location @<:@using bundled by default@:>@])],
 	[
@@ -119,11 +120,14 @@ AC_ARG_WITH(polybench,
 		fi
 	]
 	)
+AC_SUBST(POLYBENCH_DIR)
+POLYBENCH_DIR=$with_polybench
 AC_MSG_RESULT(${with_polybench_result})
 
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
+AC_CONFIG_FILES([tests/polybench_test.sh], [chmod +x tests/polybench_test.sh])
 AC_CONFIG_FILES([Makefile])
 
 
