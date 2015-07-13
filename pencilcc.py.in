@@ -370,6 +370,7 @@ def parsecmd(defaultcfg, is_tool):
 
 
 	# Passed to PPCG only
+	parser.add_argument('--target', metavar='TARGET', choices=['opencl', 'prl'], help=argparse.SUPPRESS)
 	if not is_tool:
 		parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[], help=argparse.SUPPRESS)
 		parser.add_argument('--no-isl-schedule-separate-components', action='store_true', help=argparse.SUPPRESS)
@@ -378,14 +379,13 @@ def parsecmd(defaultcfg, is_tool):
 		parser.add_argument('--no-private-memory', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--sizes', metavar='SIZES', help=argparse.SUPPRESS)
 		parser.add_argument('--dump-sizes', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--target', metavar='TARGET', choices=['opencl', 'prl'], help=argparse.SUPPRESS)
 		parser.add_argument('--no-opencl-print-kernel-types', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--no-schedule-whole-component', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--schedule-maximize-coincidence', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--pet-autodetect', action='store_true', help=argparse.SUPPRESS)
 
 	if is_tool:
-		parser.add_argument('tool')
+		parser.add_argument('tool', metavar='TOOL')
 		parser.add_argument('tool_args', nargs=argparse.REMAINDER)
 	else:
 		add_captured_cc_args(parser)
@@ -394,16 +394,31 @@ def parsecmd(defaultcfg, is_tool):
 	known, unknown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
 	if is_tool:
 		# Parse the tool's arguments
-		parser = argparse.ArgumentParser(add_help=False)
+		parser = argparse.ArgumentParser(prog=known.tool, add_help=False)
 		add_captured_cc_args(parser)
 		tool_known, tool_unkown = parser.parse_known_args(known.tool_args)
+		known.pencil_cc = known.tool
 		known.D = tool_known.D
 		known.I = tool_known.I
 		known.std = tool_known.std
 		known.o = tool_known.o
-		known.pencil_cc = tool_known.tool
-		known.cc_args = tool_known.tool_args
+		known.cc_args = tool_unkown
 		known.ppcg_args = unknown
+
+		# Just dummy properties, they are parsed as 'unkonown'
+		known.opencl_include_file = []
+		known.no_isl_schedule_separate_components = None
+		known.isl_schedule_max_coefficient = None
+		known.no_shared_memory = None
+		known.no_private_memory = None
+		known.sizes = None
+		known.dump_sizes = None
+		known.no_opencl_print_kernel_types = None
+		known.no_schedule_whole_component = None
+		known.schedule_maximize_coincidence = None
+		known.pencil_ppcg_args = []
+		known.pencil_cc_args = []
+		known.pet_autodetect = None
 	else:
 		known.cc_args = unknown
 		known.ppcg_args = []

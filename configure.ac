@@ -127,6 +127,7 @@ AC_MSG_RESULT(${with_polybench_result})
 
 
 AC_CONFIG_FILES([pencilcc.py], [chmod +x pencilcc.py])
+AC_CONFIG_FILES([penciltool.py], [chmod +x penciltool.py])
 AC_CONFIG_FILES([tests/polybench_test.sh], [chmod +x tests/polybench_test.sh])
 AC_CONFIG_FILES([Makefile])
 

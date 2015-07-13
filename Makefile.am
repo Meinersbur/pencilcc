@@ -17,9 +17,9 @@ if BUNDLED_PRL
 SUBDIRS += prl
 endif
 
-pkgdata_SCRIPTS = pencilcc.py
+pkgdata_SCRIPTS = pencilcc.py penciltool.py
 
-CLEANFILES = pencilcc.py pencilcc
+CLEANFILES = pencilcc.py pencilcc penciltool.py penciltool
 
 TESTS = \
 	tests/polybench_test.sh \
@@ -54,14 +54,18 @@ AM_TESTS_ENVIRONMENT = \
 pencilcc: pencilcc.py
 	ln -sf $< $@
 
-all-local: pencilcc
+penciltool: penciltool.py
+	ln -sf $< $@
+
+all-local: pencilcc penciltool
 
 install-exec-local:
 	$(LN_S) -f $(DESTDIR)$(pkgdatadir)/pencilcc.py $(DESTDIR)$(bindir)/pencilcc
+	$(LN_S) -f $(DESTDIR)$(pkgdatadir)/penciltool.py $(DESTDIR)$(bindir)/penciltool
 
 uninstall-local:
 	rm -f $(DESTDIR)$(bindir)/pencilcc
-
+	rm -f $(DESTDIR)$(bindir)/penciltool
 
 # Dowload from the internet
 polybench: get-polybench.sh

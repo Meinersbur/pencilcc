@@ -1,0 +1,10 @@
+#! /usr/bin/env python3
+# -*- coding: UTF-8 -*-
+
+import pencilcc
+
+def main():
+	pencilcc.process(True)
+
+if __name__ == '__main__':
+	main()
