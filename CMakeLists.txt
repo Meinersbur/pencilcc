@@ -10,13 +10,13 @@ set(CMAKE_C_STANDARD 99)
 add_subdirectory(prl)
 add_subdirectory(ppcg)
 
-add_custom_command(OUTPUT "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c"
-  DEPENDS "${POLYBENCH_DIR}/datamining/correlation/correlation.c"
-  COMMAND ppcg --target=prl "-I${POLYBENCH_DIR}/utilities" "${POLYBENCH_DIR}/datamining/correlation/correlation.c" -o "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c"
-)
-add_executable(correlation_prl "${POLYBENCH_DIR}/utilities/polybench.c" "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c")
-target_include_directories(correlation_prl PRIVATE "${POLYBENCH_DIR}/datamining/correlation" "${POLYBENCH_DIR}/utilities")
-target_link_libraries(correlation_prl prl_opencl)
+#add_custom_command(OUTPUT "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c"
+#  DEPENDS "${POLYBENCH_DIR}/datamining/correlation/correlation.c"
+#  COMMAND ppcg --target=prl "-I${POLYBENCH_DIR}/utilities" "${POLYBENCH_DIR}/datamining/correlation/correlation.c" -o "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c"
+#)
+#add_executable(correlation_prl "${POLYBENCH_DIR}/utilities/polybench.c" "${PENCILCC_BINARY_DIR}/correlation.ppcg_prl.c")
+#target_include_directories(correlation_prl PRIVATE "${POLYBENCH_DIR}/datamining/correlation" "${POLYBENCH_DIR}/utilities")
+#target_link_libraries(correlation_prl prl_opencl)
 #set_target_properties(correlation_prl PROPERTIES C_STANDARD 99)
 
 
