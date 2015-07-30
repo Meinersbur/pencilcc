@@ -18,8 +18,8 @@ prefix='''@prefix@'''
 exec_prefix='''@exec_prefix@'''.replace('''${prefix}''', prefix)
 
 with_ppcg='''@with_ppcg@'''
-with_pencil_util='''@with_pencil_util@'''
-with_prl='''@with_pencil_util@'''
+with_pencil_util='''@with_pencil_headers@'''
+with_prl='''@with_prl@'''
 
 abs_srcdir='''@abs_srcdir@'''
 abs_builddir='''@abs_builddir@'''
