@@ -136,7 +136,7 @@ if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
 fi
 if test x"$with_pencil_util" = xbundled; then
-	AC_CONFIG_SUBDIRS(pencil-util)
+	AC_CONFIG_SUBDIRS(pencil-headers)
 fi
 if test x"$with_prl" = xbundled; then
 	AC_CONFIG_SUBDIRS(prl)
