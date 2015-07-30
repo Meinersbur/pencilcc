@@ -56,31 +56,31 @@ AM_CONDITIONAL(BUNDLED_PPCG, test "x$with_ppcg" = xbundled)
 
 AC_SUBST(PENCIL_UTIL_BUILDDIR)
 AC_SUBST(PENCIL_UTIL_SRCDIR)
-AC_SUBST(with_pencil_util)
-AX_SUBMODULE(pencil-util,no|build|bundled|system|no,bundled)
-case "$with_pencil_util" in
+AC_SUBST(with_pencil_headers)
+AX_SUBMODULE(pencil-headers,no|build|bundled|system|no,bundled)
+case "$with_pencil_headers" in
 no)
 	;;
 bundled)
-	PENCIL_UTIL_BUILDDIR="${abs_builddir}/pencil-util"
-	PENCIL_UTIL_SRCDIR="${abs_srcdir}/pencil-util"
+	PENCIL_UTIL_BUILDDIR="${abs_builddir}/pencil-headers"
+	PENCIL_UTIL_SRCDIR="${abs_srcdir}/pencil-headers"
 	subconfigure_addargs="${subconfigure_addargs} --with-pencil-util=build --with-pencil-util-builddir=${PENCIL_UTIL_BUILDDIR}" # Will overwrite inherited --with-pencil=bundled argument 
 	;;
 build)
-	PENCIL_UTIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_util_builddir/config.status --file=-`
-	PENCIL_UTIL_SRCDIR=`echo @abs_srcdir@ | $with_pencil_util_builddir/config.status --file=-`
+	PENCIL_UTIL_BUILDDIR=`echo @abs_builddir@ | $with_pencil_headers_builddir/config.status --file=-`
+	PENCIL_UTIL_SRCDIR=`echo @abs_srcdir@ | $with_pencil_headers_builddir/config.status --file=-`
 	;;
 system)
 	;;
 esac
-AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_util" = xbundled)
+AM_CONDITIONAL(BUNDLED_PENCIL_UTIL, test x"$with_pencil_headers" = xbundled)
 
 
 AC_SUBST(PRL_BUILDDIR)
 AC_SUBST(PRL_SRCDIR)
 AC_SUBST(with_prl)
 AX_SUBMODULE(prl,no|build|bundled|system|no,bundled)
-case "$with_pencil_util" in
+case "$with_pencil_headers" in
 no)
 	;;
 bundled)
@@ -135,7 +135,7 @@ AC_CONFIG_FILES([Makefile])
 if test x"$with_ppcg" = xbundled; then
 	AC_CONFIG_SUBDIRS(ppcg)
 fi
-if test x"$with_pencil_util" = xbundled; then
+if test x"$with_pencil_headers" = xbundled; then
 	AC_CONFIG_SUBDIRS(pencil-headers)
 fi
 if test x"$with_prl" = xbundled; then
