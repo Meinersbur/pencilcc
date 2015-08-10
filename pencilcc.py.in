@@ -324,8 +324,7 @@ def add_captured_cc_args(parser):
 
 
 def parsecmd(defaultcfg, is_tool):
-	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.",add_help=False,
-								  epilog="Influential environment variables: CPP, CC")
+	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.",add_help=False, epilog="Influential environment variables: CPP, CC")
 	parser.add_argument('-h', '--help', action='store_true', help="Show this help message and exit")
 	parser.add_argument('--version', action='store_true', help="Print versions of involved programs")
 	parser.add_argument('--show-invocation', action='store_true', default=False, help="Print the command that invoked pencilcc")
