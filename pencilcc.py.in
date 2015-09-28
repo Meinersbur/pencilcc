@@ -676,7 +676,7 @@ def compile(user_cppflags, user_ppcgargs, pre_cc_args, file_args, post_cc_args, 
 		if filearg.is_arg():
 			continue
 
-		infile = filearg.input_file
+		infile = os.path.abspath(filearg.input_file)
 		dirname, basename = os.path.split(infile)
 		rootname,ext = os.path.splitext(basename)
 		ispencil = has_ext(infile, known.pencil_ext)
