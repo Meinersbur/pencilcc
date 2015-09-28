@@ -26,6 +26,7 @@ TESTS = \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
 	tests/check-prl_alloc.sh \
+	tests/check-prl_mem_alloc.sh \
 	tests/check-prl_manage.sh \
 	tests/check-prl_manage_host.sh
 
