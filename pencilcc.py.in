@@ -529,7 +529,7 @@ def process(is_tool):
 		config.merge(get_default_config())
 
 	if known.help:
-		known, parser = parsecmd(config) # To use correct defaults
+		known, parser = parsecmd(config, is_tool) # To use correct defaults
 		parser.print_help()
 		return 
 
