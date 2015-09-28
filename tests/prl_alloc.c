@@ -1,12 +1,5 @@
-
-
-
 #include <stdlib.h>
 #include <prl_mem.h>
-
-
-
-
 
 static void kernel(int n, float A[static const restrict n], float val) {
 #pragma scop
@@ -15,7 +8,6 @@ static void kernel(int n, float A[static const restrict n], float val) {
 	}
 #pragma endscop
 }
-
 
 int main() {
 	float *A = prl_alloc(128*sizeof*A);

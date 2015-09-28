@@ -28,7 +28,8 @@ TESTS = \
 	tests/check-prl_alloc.sh \
 	tests/check-prl_mem_alloc.sh \
 	tests/check-prl_manage.sh \
-	tests/check-prl_manage_host.sh
+	tests/check-prl_manage_host.sh \
+	tests/check-prl_manage_dev.sh
 
 EXTRA_DIST = \
 	autogen.sh \
@@ -41,10 +42,14 @@ EXTRA_DIST = \
 	tests/check-simple-keep.sh \
 	tests/prl_alloc.c \
 	tests/check-prl_alloc.sh \
+	tests/prl_mem_alloc.c \
+	tests/check-prl_mem_alloc.sh \
 	tests/prl_manage.c \
 	tests/check-prl_manage.sh \
 	tests/prl_manage_host.c \
-	tests/check-prl_manage_host.sh
+	tests/check-prl_manage_host.sh \
+	tests/prl_manage_dev.c \
+	tests/check-prl_manage_dev.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \

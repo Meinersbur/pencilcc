@@ -1,15 +1,9 @@
-
-
-
 #include <stdlib.h>
 #include <prl_mem.h>
 #include <prl_opencl.h>
 #include <assert.h>
 
 #include <CL/opencl.h>
-
-
-
 
 static void kernel(int n, float A[static const restrict n], float val) {
 #pragma scop
@@ -19,15 +13,12 @@ static void kernel(int n, float A[static const restrict n], float val) {
 #pragma endscop
 }
 
-
 int main() {
 	float A[128];
 
 	cl_context context = prl_opencl_get_context();
-	cl_int err = CL_INT_MIN;
-	cl_mem dev_A = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof A, NULL, &err);
-	assert(err == CL_SUCCESS);
-	prl_mem mem_A = prl_opencl_mem_manage(sizeof A, A, dev_A, prl_mem_readable_writable);
+	cl_mem dev_A = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof A, NULL, NULL);
+	prl_mem mem_A = prl_opencl_mem_manage(A, dev_A, prl_mem_readable_writable);
 
 	kernel(128, A, 42);
 	kernel(128, A, 21);
