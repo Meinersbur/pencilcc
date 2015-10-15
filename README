@@ -7,7 +7,9 @@ Requirements (might be incomplete)
 ----------------------------------
 
 - C99 compiler (Tested with gcc 4.9.1)
-- automake, autoconf, libtool (Tested with version 2.69)
+- autoconf (Tested with version 2.69)
+- automake (Tested with version 1.14)
+- libtool (Tested with version 2.4.2)
 - pkg-config (Tested with version 0.26)
 - ppcg (Bundled in ppcg submodule)
   - Integer Set Library (Bundled in ppcg/isl submodule)
@@ -16,7 +18,7 @@ Requirements (might be incomplete)
     - Clang headers and libraries (Tested with versions 3.3-3.6)
       - Clang requirements (C++ compiler, headers for libedit, zlib, ...)
 - pencil headers (Bundled in pencil-headers submodule)
-- PRL (Bundeld in prl submodule)
+- PRL (Bundled in prl submodule)
 - polybench (Tested with version 3.2; automatically downloaded by the get-polybench.sh script and bundled in the dist version)
 - Python3 (Tested with version 3.4.2)
 
@@ -50,7 +52,7 @@ pencilcc/penciltool have three configuration modes:
 
 `system`) Uses no paths, but assumes that all files and tools are in the default search paths (e.g. /usr/bin, /usr/include, /usr/lib)
 
-Configuration modes can be changed explicitely using the --pencil-config command line option.
+Configuration modes can be changed explicitly using the --pencil-config command line option.
 
 
 Known Issues
