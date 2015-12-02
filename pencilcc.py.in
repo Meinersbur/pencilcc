@@ -48,14 +48,19 @@ def is_build():
 
 class Configuration:
 	props = ['config', # Informational only
-		  'ld_prog', 'ld_flags', 'ld_verbose',
-		  'cc_prog', 'cc_flags', 'cc_verbose',
-		  'use_ppcg', 'ppcg_prog', 'ppcg_flags', 'ppcg_verbose',
+		  'target', 'tool_args',
+		  #'cpp_flags',
+		  'ppcg_disabled', 'ppcg_prog', 'ppcg_flags', 'ppcg_verbose',
+		  'cc_disabled',   'cc_prog',   'cc_flags',   'cc_verbose', 'cc_isgnu',
+		  'nvcc_prog',
+		  'ld_disabled', #'ld_flags',
+		  'use_run',
 		  'pencil_h_cppflags',
 		  'pencil_opencl_ppcgflags',
 		  'ocl_utilities_cppflags', 'ocl_utilities_cflags', 
-		  'use_prl', 'prl_cppflags', 'prl_lflags',
-		  'common_cppflags','common_cflags','common_lflags']
+		  'prl_disabled', 'prl_cppflags', 'prl_lflags',
+		  'common_cppflags','common_cflags','common_lflags',
+		  'opencl_embed_kernel_code','std','pencil_ext','c_ext', 'autorpath']
 
 	def __init__(self):
 		for prop in self.props:
@@ -70,27 +75,37 @@ class Configuration:
 	# Platform introspection and default values
 	def system_config(self):
 		self.config = 'system'
+		self.target = 'prl'
 
-		self.ld_prog = 'cc'
-		self.ld_flags = []
-		self.ld_verbose = 0
+		self.tool_args = []
 
+		#self.cpp_flags = []
+
+		self.ppcg_disabled = False
+		self.ppcg_prog = 'ppcg'
+		self.ppcg_flags = []
+		self.ppcg_verbose = 0
+
+		self.cc_isgnu = None
+		self.cc_disabled = False
 		self.cc_prog = 'cc'
 		self.cc_flags = []
 		self.cc_verbose = 0
 
-		self.use_ppcg = True
-		self.ppcg_prog = 'ppcg'
-		self.ppcg_flags = []
-		self.ppcg_verbose = 0
-		
+		self.ld_disabled = False
+		#self.ld_prog = 'cc'
+		#self.ld_flags = []
+		#self.ld_verbose = 0
+
+		self.use_run = False
+
 		self.pencil_h_cppflags = []
 		self.pencil_opencl_ppcgflags = ['--opencl-include-file=pencil_opencl.h']
 
 		self.ocl_utilities_cflags = []
 		self.ocl_utilities_cppflags = []
 
-		self.use_prl = True #TODO: Search for existance of libprl_opencl in system library path
+		self.prl_disabled = False #TODO: Search for existance of libprl_opencl in system library path
 		self.prl_cppflags = []
 		self.prl_lflags = ['-lprl_opencl']
 		
@@ -98,18 +113,24 @@ class Configuration:
 		self.common_cflags = []
 		self.common_lflags = []
 
+		self.opencl_embed_kernel_code = None
+		self.std='c99'
+		self.pencil_ext=['.pencil.c','.pencil']
+		self.c_ext=['.c','.i','.ii']
+		self.autorpath = False
+
 
 	def build_config(self):
 		self.config = 'build'
 
 		if with_ppcg=='no':
-			self.use_ppcg = False
+			self.ppcg_disabled = True
 			self.ppcg_prog = ''
 			self.ppcg_verbose = 0
 			self.ocl_utilities_cppflags = []
 			self.ocl_utilities_cflags = []
 		elif with_ppcg=='bundled' or with_ppcg=='build':
-			self.use_ppcg = True
+			self.ppcg_disabled = False
 			self.ppcg_prog = os.path.join(PPCG_BUILDDIR,'ppcg')
 			self.ocl_utilities_cppflags =  ['-I', PPCG_SRCDIR]
 			self.ocl_utilities_cflags = [os.path.join(PPCG_SRCDIR,'ocl_utilities.c')]
@@ -122,11 +143,11 @@ class Configuration:
 			self.pencil_opencl_ppcgflags = ['--opencl-include-file=' + os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil_opencl.h')]
 
 		if with_prl=='no':
-			self.use_prl = False
+			self.prl_disabled = True
 			self.prl_cppflags = []
 			self.prl_lflags = []
 		elif with_prl=='bundled' or with_prl=='build':
-			self.use_prl = True
+			self.prl_disabled = False
 			self.prl_cppflags = ['-I', os.path.join(PRL_SRCDIR, 'include')]
 			self.prl_lflags = ['-L', os.path.join(PRL_BUILDDIR, 'src', '.libs'), '-lprl_opencl']
 
@@ -138,7 +159,7 @@ class Configuration:
 	def install_config(self):
 		self.config = 'install'
 		
-		self.use_ppcg = (with_ppcg!='no')
+		self.ppcg_disabled = (with_ppcg=='no')
 		self.ppcg_prog = os.path.join(bindir,'ppcg')
 		self.ppcg_flags = []
 		self.ppcg_verbose = 0
@@ -149,7 +170,7 @@ class Configuration:
 		self.ocl_utilities_cppflags = []
 		self.ocl_utilities_cflags =  [os.path.join(datadir,'ppcg','ocl_utilities.c')]
 
-		self.use_prl = (with_prl!='no')
+		self.prl_disabled = (with_prl=='no')
 		self.prl_cppflags = []
 		self.prl_lflags = ['-lprl_opencl']
 		
@@ -221,7 +242,6 @@ print_commands_baseonly = False
 config = Configuration()
 
 
-
 def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,prefix='$ '):
 	if print_commands or force:
 		shortcmd = os.path.basename(cmd) if print_commands_baseonly else shlex.quote(cmd)
@@ -233,7 +253,7 @@ def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,pre
 			for envkey,envval in appendenv.items():
 				if not envval:
 					continue
-				setenvs += [envkey + '=${' + envkey + '}:' + shlex.quote(envval)]
+				setenvs += [envkey + '=' + ':'.join(['${' + envkey + '}'] + [shlex.quote(envitem) for envitem in envval])]
 		setenv=''
 		for elt in setenvs:
 			setenv += elt + ' '
@@ -242,26 +262,26 @@ def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,pre
 		else:
 			print(prefix + '(cd ' + shlex.quote(cwd) + ' && ' + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]) + ')',file=sys.stderr)
 
-def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False):
+
+def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False,stdout=None,stderr=None):
 	print_command(cmd, *args,cwd=cwd,addenv=addenv,appendenv=appendenv)
 	env=None
 	if addenv is not None or appendenv is not None:
 		env = copy.copy(os.environ)
-	if addenv is not None:
-		env.update(addenv)
-	if appendenv is not None:
-		for key,val in appendenv.items():
-			if not val:
-				continue
-			oldval = env.get(key)
-			if oldval:
-				env[key] = oldval + ':' + val
-			else:
-				env[key] = val
+		if addenv is not None:
+			env.update(addenv)
+		if appendenv is not None:
+			for key,val in appendenv.items():
+				allval = []
+				if key in env:
+					allval += env.get(key)
+				allval += [shlex.quote(item) for item in val]
+				env[key] = ':'.join(allval)
+
 	sys.stdout.flush()
 	sys.stderr.flush()
 	if not showonly:
-		rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env)
+		rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env,stdout=stdout,stderr=stderr)
 		if rtncode!=0:
 			exit(rtncode)
 
@@ -272,32 +292,7 @@ def verbosity(lvl):
 	return []
 
 
-def call_ppcg(*args):
-	invoke(config.ppcg_prog, *args)
-def invoke_ppcg(*args):
-	allargs = verbosity(config.ppcg_verbose)
-	allargs += config.ppcg_flags
-	allargs += args
-	call_ppcg(*args)
-
-def call_cc(*cmdline):
-	invoke(config.cc_prog, *cmdline)
-def invoke_cc(*cmdline):
-	extra_flags = verbosity(config.cc_verbose)
-	extra_flags += config.cc_flags
-	extra_flags += cmdline
-	call_cc(*extra_flags)
-
-def call_ld(*cmdline):
-	invoke(config.ld_prog, *cmdline)
-def invoke_ld(*cmdline):
-	extra_flags = verbosity(config.ld_verbose)
-	extra_flags += config.ld_flags
-	extra_flags += cmdline
-	call_ld(*extra_flags)
-
-
-# Currently unused
+# Currently unused; could be used with build configuration
 def invoke_libtool_cc(*cmdline):
 	extra_flags = verbosity(config.cc_verbose)
 	extra_flags += config.cc_flags
@@ -309,31 +304,22 @@ def print_versions():
 	print("PENCIL driver", '''@GIT_HEAD_ID@''')
 	print()
 
-	if config.ppcg_prog:
-		print("ppcg: ")
+	if config.ppcg_prog is not None:
 		try:
-			call_ppcg('--version')
-		except Exception:
-			pass
+			invoke(config.ppcg_prog, '--version')
+		except Exception as e:
+			print('ppcg:', e)
 		print()
 
-	if config.cc_prog:
-		print("cc: ")
+	if config.cc_prog is not None:
 		try:
-			call_cc('--version')
-		except Exception:
-			pass
+			invoke(config.cc_prog, '--version')
+		except Exception as e:
+			print('cc:', e)
 		print()
 
-	if config.ld_prog:
-		print("ld: ")
-		try:
-			call_ld('--version')
-		except Exception:
-			pass
-		print()
 
-def add_captured_cc_args(parser):
+def add_captured_cc_args(defaultcfg, parser):
 	# Passed to PPCG and CC
 	parser.add_argument('-D', action='append', default=[], help=argparse.SUPPRESS)
 	parser.add_argument('-I', action='append', default=[], help=argparse.SUPPRESS)
@@ -342,60 +328,63 @@ def add_captured_cc_args(parser):
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
 	parser.add_argument('-c', action='store_true', default=False, help=argparse.SUPPRESS)
 	parser.add_argument('-std', metavar='STD', choices=['gnu99', 'c99'],
-		help="C standard mode (default: c99)") #TODO: What if cc is not gcc? What with other standards?
+		help="C standard mode (default: " + defaultcfg.std + ")")
 
 
 def parsecmd(defaultcfg, is_tool):
-	parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.",add_help=False)
+	if sys.version_info >= (3,5,0):
+		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False, allow_abbrev=False)
+	else:
+		 # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
+		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False)
 	parser.add_argument('-h', '--help', action='store_true', help="Show this help message and exit")
 	parser.add_argument('--version', action='store_true', help="Print versions of involved programs")
 	parser.add_argument('--show-invocation', action='store_true', default=False, help="Print the command that invoked pencilcc")
 	parser.add_argument('--show-commands', action='store_true', default=False, help="Print executed commands")
 	parser.add_argument('--show-commands-baseonly', action='store_true', default=False, help="Do not print full command path")	
-	parser.add_argument('--show-run-var', choices=['LD_LIBRARY_PATH'], help="Show the effective variable and exit") # TODO: Something more general?
 	parser.add_argument('--show-config', action='store_true', help="Show tools' flags and exit")
+	parser.add_argument('--show-ppcg-args', choices=['PROG', 'FLAGS', 'CPPFLAGS', 'DEFS', 'DEFFLAGS', 'INCLUDE_DIRS'], help="Show the flags passed to ppcg and exit")
+	parser.add_argument('--show-cc-args',   choices=['PROG', 'FLAGS', 'CPPFLAGS', 'DEFS', 'DEFFLAGS', 'INCLUDE_DIRS', 'LIBS', 'LIBRARY_DIRS'], help="Show the flags passed to cc and exit")
+	parser.add_argument('--show-run-args', choices=['LD_LIBRARY_PATH'], help="Show the effective variable and exit")
+	parser.add_argument('--show-listsep', default=' ')
 
 	parser.add_argument('-v', '--verbose', action='count', default=0, help="More verbose output")
 	parser.add_argument('--pencil-config', choices=['system', 'build', 'install'], help="Introspection to use")
 
 	parser.add_argument('--keep', action='store_true', help="Keep temporary files next to files to compile")
-	parser.add_argument('--keep-tmp', action='store_true', help="Do not delete temporary directory when finished")
+	parser.add_argument('--keep-dir', action='store_true', help="Do not delete temporary directory when finished")
 	parser.add_argument('--pencil-tmpdir', help="Directory to use for temporary files")
 
-	parser.add_argument('--pencil-ppcg', metavar='PPCG', default=None, help="Path to ppcg (default: " + defaultcfg.ppcg_prog + ")")
+	parser.add_argument('--ppcg',dest='ppcg',action='store_true')
+	parser.add_argument('--no-ppcg',dest='ppcg',action='store_false')
+	parser.add_argument('--ppcg-prog',metavar='PPCG',default=None,help="Path to ppcg executable (default: " + defaultcfg.ppcg_prog + ")")
+	parser.add_argument('--ppcg-arg',action='append',help="Additional argument for ppcg")
+	parser.add_argument('--ppcg-args',action='append',help="Additional arguments for ppcg")
+
 	if not is_tool:
-		parser.add_argument('--pencil-ppcg-args', action='append', default=[], metavar='ARGS', help="Additional argument to pass to PPCG")
-		parser.add_argument('--pencil-cc', metavar='CC', help="C compiler (default: " + defaultcfg.cc_prog + ")")
-		parser.add_argument('--pencil-cc-args', action='append', default=[], metavar='ARGS', help="Additional argument to pass to CC")
-		parser.add_argument('--pencil-ld', metavar='LD', help="Linker (default: " + defaultcfg.ld_prog + ")")
-		parser.add_argument('--pencil-ld-args', action='append', default=[], metavar='ARGS', help="Additional argument to pass to LD")
-	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action='append', default=['.pencil.c', '.pencil'],
+		parser.add_argument('--cc',dest='cc',action='store_true')
+		parser.add_argument('--no-cc',dest='cc',action='store_false')
+		parser.add_argument('--cc-prog',help="Path to C compiler executable (default:" + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
+		parser.add_argument('--cc-arg',action='append',help="Additional compiler argument")
+		parser.add_argument('--cc-args',action='append',help="Additional compiler arguments")
+
+	parser.add_argument('--autorpath', action='store_true', help="Set linker rpath to runtime libraries.")
+	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action='append', default=defaultcfg.pencil_ext,
 		help="File extentions for forcing --pet-autodetect (default: .pencil.c,.pencil)")
-	parser.add_argument('--c-ext', metavar='SUFFIXES', action='append', default=['.c','.i','.ii'],
+	parser.add_argument('--c-ext', metavar='SUFFIXES', action='append', default=defaultcfg.c_ext,
 		help="File extensions that are to be processed by ppcg (implicitely includes all --pencil-ext)")
 
 	# Action control
 	parser.add_argument('--noselfupdate', dest='selfupdate', action='store_false', default=True,
 		help="Do not try to update yourself" if is_build() else argparse.SUPPRESS)
-	parser.add_argument('--run', action='store_true', help="Run executable after compilation")
-	parser.add_argument('--launch', nargs=argparse.REMAINDER, help="Run the argument (no compilation done)")
 
-	#parser.add_argument('--pencil-output', choices=['opt', 'ppcg'],  help='Stop after this tool instead the entire toolchain (default: ld)')
-
-	#parser.add_argument('--pencil-ppcg', action='store_true', default=None,
-	#	help="Use ppcg in toolchain" if not defaultcfg.use_ppcg and with_ppcg!='no' else argparse.SUPPRESS)
-	#parser.add_argument('--pencil-noppcg', action='store_true',  default=None,
-	#	help="Do not use ppcg in toolchain" if defaultcfg.use_ppcg and with_ppcg!='no' else argparse.SUPPRESS)
-
-
-	#parser.add_argument('--pencil-runtime', action='store_true', default=None,
-	#	help="Use the PENCIL OpenCL runtime" if not defaultcfg.use_prl else argparse.SUPPRESS)
-	#parser.add_argument('--pencil-noruntime', action='store_true',default=None,
-	#	help="Do not use the PENCIL OpenCL runtime" if defaultcfg.use_prl else argparse.SUPPRESS)
-
+	#TODO: --run clashes with a nvcc command line option
+	parser.add_argument('--run',    dest='run', action='store_true', help="Run executable after compilation")
+	parser.add_argument('--no-run', dest='run', action='store_false')
+	parser.set_defaults(ppcg=None,cc=None,run=None)
 
 	# Passed to PPCG only
-	parser.add_argument('--target', metavar='TARGET', choices=['opencl', 'prl'], help=argparse.SUPPRESS)
+	parser.add_argument('--target', metavar='TARGET', choices=['prl', 'opencl'], default='prl')
 	if not is_tool:
 		parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[], help=argparse.SUPPRESS)
 		parser.add_argument('--no-isl-schedule-separate-components', action='store_true', help=argparse.SUPPRESS)
@@ -408,29 +397,34 @@ def parsecmd(defaultcfg, is_tool):
 		parser.add_argument('--no-schedule-whole-component', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--schedule-maximize-coincidence', action='store_true', help=argparse.SUPPRESS)
 		parser.add_argument('--pet-autodetect', action='store_true', help=argparse.SUPPRESS)
+		parser.add_argument('--opencl-embed-kernel-code', action='store_false', dest='opencl_embed_kernel_code',  help=argparse.SUPPRESS)
+		parser.add_argument('--no-opencl-embed-kernel-code', action='store_true', dest='opencl_embed_kernel_code', help=argparse.SUPPRESS)
 
 	if is_tool:
 		parser.add_argument('tool', metavar='TOOL')
 		parser.add_argument('tool_args', nargs=argparse.REMAINDER)
 	else:
-		add_captured_cc_args(parser)
+		add_captured_cc_args(defaultcfg, parser)
 
 
-	known, unknown = parser.parse_known_args() # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
+	known, unknown = parser.parse_known_args()
 	if is_tool:
 		# Parse the tool's arguments
-		parser = argparse.ArgumentParser(prog=known.tool, add_help=False)
-		add_captured_cc_args(parser)
+		if sys.version_info >= (3,5,0):
+			parser = argparse.ArgumentParser(prog=known.tool, add_help=False, allow_abbrev=False)
+		else:
+			parser = argparse.ArgumentParser(prog=known.tool, add_help=False)
+		add_captured_cc_args(defaultcfg, parser)
 		tool_known, tool_unkown = parser.parse_known_args(known.tool_args)
-		known.pencil_cc = known.tool
+		known.cc_prog = known.tool
 		known.D = tool_known.D
 		known.I = tool_known.I
 		known.std = tool_known.std
 		known.o = tool_known.o
-		known.cc_args = tool_unkown
+		known.tool_args = tool_unkown
 		known.ppcg_args = unknown
 
-		# Just dummy properties, they are parsed as 'unkonown'
+		# Just dummy properties, they are parsed as 'unknown'
 		known.opencl_include_file = []
 		known.no_isl_schedule_separate_components = None
 		known.isl_schedule_max_coefficient = None
@@ -441,73 +435,259 @@ def parsecmd(defaultcfg, is_tool):
 		known.no_opencl_print_kernel_types = None
 		known.no_schedule_whole_component = None
 		known.schedule_maximize_coincidence = None
-		known.pencil_ppcg_args = []
-		known.pencil_cc_args = []
 		known.pet_autodetect = None
 	else:
-		known.cc = None
-		known.cc_args = unknown
-		known.ppcg_args = []
+		known.tool_args = unknown
 
 	return known, parser
 
+
+def error_exit(msg):
+	print(msg, file=sys.stderr)
+	exit(4)
 
 
 def get_config_from_argparse(known):
 	config = Configuration()
 
-	if known.pencil_ppcg is not None:
-		config.ppcg_prog = known.pencil_ppcg_path
-	config.ppcg_verbose = max(0, known.verbose - 1)
+	if known.ppcg is not None:
+		config.ppcg_disabled = not known.ppcg
+	if known.ppcg_prog is not None:
+		config.ppcg_prog = known.ppcg_prog
+	if known.verbose is not None:
+		config.ppcg_verbose = max(0, known.verbose - 1)
 
 	if known.cc is not None:
-		config.cc_prog = known.cc
-	elif known.pencil_cc is not None:
-		config.cc_prog = known.pencil_cc
-	if known.pencil_cc_args:
-		config.cc_flags += known.pencil_cc_args
-	config.cc_verbose = max(0, known.verbose - 1)
+		config.cc_disabled = not known.cc
+		config.ld_disabled = not known.cc
+	if known.cc_prog is not None:
+		config.cc_prog = known.cc_prog
+	if known.verbose is not None:
+		config.cc_verbose = max(0, known.verbose - 1)
+	config.cc_isgnu = None # Unknown; will test later
 
-	if known.pencil_ld is not None:
-		config.ld_prog = known.pencil_ld
-	if known.pencil_ld_args:
-		config.ld_flags += known.pencil_ld_args
-	config.ld_verbose = max(0, known.verbose - 1)
+	if known.target == 'opencl':
+		config.target = 'opencl'
+		config.prl_disabled = True
+	else:
+		config.target = 'prl'
+		config.prl_disabled = False
 
-	if known.target is not None:
-		if known.target == 'prl':
-			config.use_prl = True
-		elif known.target == 'opencl':
-			config.use_prl = False
+	if known.c is not None:
+		config.ld_disabled = known.c
+	if known.autorpath is not None:
+		config.autorpath = known.autorpath
+
+	# If any of these flags is true, set all of them (so user does not have to switch off passes explicitely)
+	if known.cc or known.ppcg  or known.run:
+		config.ppcg_disabled = known.ppcg!=True
+		config.cc_disabled = known.cc!=True
+		config.use_run = known.run==True
+	else:
+		if known.ppcg is not None:
+			config.ppcg_disabled = not known.ppcg
+		if known.cc is not None:
+			config.cc_disabled = not known.cc
+		if known.run is not None:
+			config.use_run = known.run
+
+	if known.pencil_ext is not None:
+		config.pencil_ext = known.pencil_ext
+	if known.c_ext is not None:
+		config.c_ext = known.c_ext
+
+	config.cpp_flags = []
+	config.ppcg_flags = []
+	config.cc_flags = []
+
+	for incfile in known.opencl_include_file:
+		config.ppcg_flags += ['--opencl-include-file=' + incfile]
+	if known.no_isl_schedule_separate_components:
+		config.ppcg_flags += ['--no-isl-schedule-separate-components']
+	if not known.isl_schedule_max_coefficient is None:
+		config.ppcg_flags += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
+	if known.no_shared_memory:
+		config.ppcg_flags += ['--no-shared-memory']
+	if known.no_private_memory:
+		config.ppcg_flags += ['--no-private-memory']
+	if known.sizes is not None:
+		config.ppcg_flags += ['--sizes=' + known.sizes]
+	if known.dump_sizes:
+		config.ppcg_flags += ['--dump-sizes']
+	if known.no_opencl_print_kernel_types:
+		config.ppcg_flags += ['--no-opencl-print-kernel-types']
+	if known.no_schedule_whole_component:
+		config.ppcg_flags += ['--no-schedule-whole-component']
+	if known.schedule_maximize_coincidence:
+		config.ppcg_flags += ['--schedule-maximize-coincidence']
+	if known.opencl_embed_kernel_code is not None:
+		config.opencl_embed_kernel_code = known.opencl_embed_kernel_code
+
+	for flag in known.D:
+		config.cpp_flags += ['-D' + flag]
+	for i in known.I:
+		config.cpp_flags += ['-I', i]
+
+	if known.std is not None:
+		config.std = known.std
+
+	if known.cc_args is not None:
+		config.cc_flags += [s for args in known.cc_args for s in shlex.split(args)]
+	if known.cc_arg is not None:
+		config.cc_flags += known.cc_arg
+	if known.ppcg_args is not None:
+		config.ppcg_flags += [s for args in known.ppcg_args for s in shlex.split(args)]
+	if known.ppcg_arg is not None:
+		config.ppcg_flags += known.ppcg_arg
 
 	return config
 
 
-def get_run_ld_library_path():
-	runtime_lflags = []
-	runtime_lflags += config.common_lflags
-	runtime_lflags += config.prl_lflags
-
-	# Parse lflags, search for paths
-	lflagsparser = argparse.ArgumentParser(add_help=False)
-	lflagsparser.add_argument('-L', action='append')
-	lflagsparser.add_argument('-l', action='append')
-	lflags, other = lflagsparser.parse_known_args([''] + runtime_lflags)
-
-	libpaths = []
-	for L in lflags.L:
-		libpaths.append(L)
-	return ':'.join(libpaths)
-
-
-
-def launch(*args):
-	libpaths=get_run_ld_library_path()
-
-	if not libpaths:
-		invoke(*args)
+def parse_cc_arguments(args):
+	if sys.version_info >= (3,5,0):
+		flagsparser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
 	else:
-		invoke(*args,appendenv={'LD_LIBRARY_PATH': libpaths})
+		flagsparser = argparse.ArgumentParser(add_help=False)
+	flagsparser.add_argument('-L', action='append', default=[])
+	flagsparser.add_argument('-l', action='append', default=[])
+	flagsparser.add_argument('-D', action='append', default=[])
+	flagsparser.add_argument('-I', action='append', default=[])
+	return flagsparser.parse_known_args([''] + args)
+
+
+def extract_library_paths(args):
+	lflags, other = parse_cc_arguments(args)
+	libpaths = set()
+	for L in lflags.L:
+		libpaths.add(L)
+	for l in lflags.l:
+		path,_ = os.path.split(l)
+		if not path:
+			continue
+		path = os.path.dirname(path)
+		libpaths.add(path)
+	return libpaths
+
+
+def assemble_cpp_args(pencil_level,has_extc,has_pencil):
+	global config
+	cppflags = []
+
+	if has_extc or has_pencil:
+		if pencil_level is not None:
+			cppflags += ['-D__PENCIL__=' + str(pencil_level)]
+		if not has_extc:
+			cppflag += ['-D__PENCIL_PURE__']
+	cppflags += ['-D__PENCIL_OPENCL__']
+
+	cppflags += config.common_cppflags
+	cppflags += config.pencil_h_cppflags
+	if config.prl_disabled:
+		cppflags += config.ocl_utilities_cppflags
+	else:
+		cppflags += config.prl_cppflags
+	cppflags += config.cpp_flags
+
+	return cppflags
+
+
+def assemble_ppcg_args(infile, outfile, ispencil, force_embed):
+	global config
+	ppcgargs = []
+
+	ppcgargs += verbosity(config.ppcg_verbose)
+	if infile is not None:
+		ppcgargs += [infile]
+	ppcgargs += assemble_cpp_args(2,not ispencil,ispencil)
+	ppcgargs += ['--target=' + config.target]
+	if ispencil:
+		ppcgargs += ['--pet-autodetect']
+	if config.opencl_embed_kernel_code or force_embed:
+		ppcgargs += ['--opencl-embed-kernel-code']
+	ppcgargs += config.pencil_opencl_ppcgflags
+	ppcgargs += config.ppcg_flags
+	if outfile is not None:
+		ppcgargs += ['-o', outfile]
+	return ppcgargs
+
+
+def exec_ppcg(infile, outfile, ispencil, force_embed):
+	global config
+
+	ppcg_args = assemble_ppcg_args(infile, outfile, ispencil, force_embed)
+	invoke(config.ppcg_prog, *ppcg_args)
+
+
+def assemble_cc_args(args, outfile, origdirrefs, has_extc, has_pencil):
+	global config
+
+	ccargs = []
+	ccargs += verbosity(config.cc_verbose)
+	if origdirrefs is not None:
+		ccargs += origdirrefs
+	ccargs += assemble_cpp_args(3, has_extc, has_pencil)
+	ccargs += config.common_cflags
+
+	# TODO: Test if GNU/clang before appending such flags
+	if config.cc_isgnu:
+		if config.std is not None:
+			ccargs += ['-std=' + config.std]
+		#ccargs += ['-Wno-attributes']                    # __attribute__((pencil_access)) not removed by ppcg
+		#ccargs += ['-Wno-implicit-function-declaration'] # __pencil_use/def/maybe left in summary functions
+
+	ccargs += [s for filearg in args for s in filearg.arg_or_latest_file()]
+
+	ldargs = []
+	if config.ld_disabled:
+		ccargs += ['-c']
+	else:
+		# add linking args behind files
+		ldargs += config.common_lflags
+		if config.prl_disabled:
+			ldargs += config.ocl_utilities_cflags
+		else:
+			ldargs += config.prl_lflags
+		ldargs += ['-lOpenCL', '-lm']
+
+	if config.autorpath:
+		libpaths = extract_library_paths(ldargs)
+		for libpath in libpaths:
+			ldargs += ['-Wl,-rpath', '-Wl,' + libpath]
+
+	outarg = []
+	if outfile is not None:
+		outarg += ['-o', outfile]
+
+	return ccargs + ldargs + config.cc_flags + outarg
+
+
+def launch(prog, ccargs):
+	ldlibrary = extract_library_paths(ccargs)
+	invoke(prog,appendenv={'LD_LIBRARY_PATH': ldlibrary})
+
+
+def is_gnu(cc, tmpdir):
+	ccfilename = os.path.join(tmpdir,'checkgnu.c')
+	with open(ccfilename, "w") as ccfile:
+		ccfile.write("""
+int main() {
+#ifdef __GNUC__
+	return 0;
+#else
+	This is not gcc!
+#endif
+}
+			""")
+	try:
+		invoke(cc,'-std=c99','-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+	except:
+		return False
+	return True
+
+
+def err_exit(msg):
+	print(msg, file=sys.stderr)
+	exit(4)
 
 
 class CCArg:
@@ -525,11 +705,38 @@ class CCArg:
 		return self.arg is not None
 
 	def latest_file(self):
-		return self.generated_file or self.input_file
+		return self.generated_file if self.generated_file is not None else [self.input_file]
 
 	def arg_or_latest_file(self):
-		return self.arg or self.latest_file()
+		return [self.arg] if self.arg is not None else self.latest_file()
 
+def print_list(list,listsep,shellargs):
+	print(listsep.join([shlex.quote(s) for s in list]))
+
+
+def show_args(what, listsep, prog, args):
+	if what=='PROG':
+		print(prog)
+		return
+	if what=='FLAGS':
+		print_list(args, listsep, True)
+		return
+	if what=='LD_LIBRARY_PATH':
+		print_list(extract_library_paths(args), listsep, False)
+		return
+	args, other = parse_cc_arguments(args)
+	if what=='CPPFLAGS':
+		print_list(['-I' + I for I in args.I] + ['-D' + D for D in args.D], listsep, True)
+	elif what=='DEFS':
+		print_list(args.D, listsep, False)
+	elif what=='DEFFLAGS':
+		print_list(['-D' + D for D in args.D], listsep, True)
+	elif what=='INCLUDE_DIRS':
+		print_list(args.I, listsep, False)
+	elif what=='LIBS':
+		print_list(args.l, listsep, False)
+	elif what=='LIBRARY_DIRS':
+		print_list(args.L, listsep, False)
 
 
 def process(is_tool):
@@ -545,7 +752,7 @@ def process(is_tool):
 
 	# Re-configure the script automatically if in builddir
 	if known.selfupdate and is_build():
-		invoke('make', os.path.basename(script),cwd=os.path.dirname(script))
+		invoke('make', os.path.basename(script),cwd=os.path.dirname(script),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
 		cmdline = [ x for x in cmdline if x !=  '--show-invocation'] # Do not show invocation a second time
 		invoke(*cmdline)
@@ -567,31 +774,14 @@ def process(is_tool):
 		parser.print_help()
 		return 
 
-	if known.show_config:
-		show_config(config)
-		return
-
 	if known.version:
 		print_versions()
 		return
 
-	if known.show_run_var:
-		# Only LD_LIBRARY_PATH supported at the moment
-		print(get_run_ld_library_path())
-		return
-
-	if known.launch:
-		launch(*known.launch)
-		return
-
-	pre_cc_args = []
-	cc_args = known.cc_args
-	post_cc_args = []
-
 	file_args = []
 	n_files = 0
 	prev_is_l = False
-	for arg in cc_args:
+	for arg in known.tool_args:
 		if prev_is_l:
 			file_args += [CCArg(arg, False)]
 			prev_is_l = False
@@ -604,83 +794,53 @@ def process(is_tool):
 			file_args += [CCArg(arg, True)]
 			n_files += 1
 
-	if n_files<=0:
-		print("No input files")
-		exit(4)
+	with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
+		if config.cc_isgnu is None:
+			config.cc_isgnu = is_gnu(config.cc_prog, tmpdir)
 
-	user_cppflags = []
-	for flag in known.D:
-		user_cppflags += ['-D' + flag]
-	for i in known.I:
-		user_cppflags += ['-I', i]
+		if known.show_ppcg_args is not None:
+			show_args(known.show_ppcg_args, known.show_listsep, config.ppcg_prog, assemble_ppcg_args(None, None, None, None))
+			return
+		if known.show_cc_args is not None:
+			show_args(known.show_cc_args, known.show_listsep, config.cc_prog, assemble_cc_args([arg for arg in file_args if arg.is_arg()], None, [], None, None))
+			return
+		if known.show_run_args is not None:
+			show_args(known.show_run_args, known.show_listsep, config.cc_prog, assemble_cc_args([arg for arg in file_args if arg.is_arg()], None, [], None, None))
+			return
+		if known.show_config:
+			show_config(config)
+			return
 
-	ppcgargs = []
-	for incfile in known.opencl_include_file:
-		ppcgargs += ['--opencl-include-file=' + incfile]
-	if known.no_isl_schedule_separate_components:
-		ppcgargs += ['--no-isl-schedule-separate-components']
-	if not known.isl_schedule_max_coefficient is None:
-		ppcgargs += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
-	if known.no_shared_memory:
-		ppcgargs += ['--no-shared-memory']
-	if known.no_private_memory:
-		ppcgargs += ['--no-private-memory']
-	if not known.sizes is None:
-		ppcgargs += ['--sizes=' + known.sizes]
-	if known.dump_sizes:
-		ppcgargs += ['--dump-sizes']
-	if known.no_opencl_print_kernel_types:
-		ppcgargs += ['--no-opencl-print-kernel-types']
-	if known.no_schedule_whole_component:
-		ppcgargs += ['--no-schedule-whole-component']
-	if known.schedule_maximize_coincidence:
-		ppcgargs += ['--schedule-maximize-coincidence']
+		if n_files<=0:
+			err_exit("No input files")
 
-	ppcgargs += known.ppcg_args
-	ppcgargs += [s for args in known.pencil_ppcg_args for s in shlex.split(args)]
+		if config.ppcg_disabled and config.cc_disabled and config.ld_disabled and not config.use_run:
+			print("Toolchain is empty; nothing to do")
+			exit(0)
+		elif not config.ppcg_disabled and config.cc_disabled and not config.ld_disabled:
+			err_exit("Cannot link generated source without compiling it")
+		elif config.use_run and config.ld_disabled:
+			err_exit("Cannot run program without linking")
+		elif not config.ppcg_disabled and config.cc_disabled and (n_files!=1) and known.o is not None:
+			err_exit("Can just take one input file")
 
-	post_cc_args += [s for args in known.pencil_cc_args for s in shlex.split(args)]
-
-	if known.keep:
-		compile(user_cppflags, ppcgargs, pre_cc_args, file_args, post_cc_args, None, known.o, known)
-	elif known.pencil_tmpdir:
-		tmpdir = known.pencil_tmpdir
-		if os.path.isdir(tmpdir):
-			# Do not delete directories we did not create
-			compile(user_cppflags, ppcgargs, pre_cc_args, file_args, post_cc_args, tmpdir, known.o,  known)
+		if known.keep:
+			compile(file_args, None, known.o)
+		elif known.pencil_tmpdir:
+			tmpdir = known.pencil_tmpdir
+			if os.path.isdir(tmpdir):
+				# Do not delete directories we did not create
+				compile(file_args, tmpdir, known.o)
+			else:
+				os.makedirs(tmpdir)
+				compile(file_args, tmpdir, known.o)
+				if not known.keep_dir:
+					shutil.rmtree(tmpdir)
+		elif known.keep_dir is not None:
+			tmpdir = tempfile.mkdtemp(prefix='pencil.')
+			compile(file_args, tmpdir, known.o)
 		else:
-			os.makedirs(tmpdir)
-			compile(user_cppflags, ppcgargs, pre_cc_args, file_args, post_cc_args, tmpdir, known.o, known)
-			if not known.keep_tmp:
-				shutil.rmtree(tmpdir)
-	elif known.keep_tmp:
-		tmpdir = tempfile.mkdtemp(prefix='pencil.')
-		compile(user_cppflags, ppcgargs, pre_cc_args, file_args, post_cc_args, tmpdir, known.o, known)
-	else:
-		with tempfile.TemporaryDirectory(prefix='pencil.') as tmpdir:
-			compile(user_cppflags, ppcgargs, pre_cc_args, file_args, post_cc_args, tmpdir, known.o, known)
-
-	if known.run:
-		execfilename = 'a.out'
-		if known.o is not None:
-			execfilename = known.o
-		if not os.path.isabs(execfilename):
-			execfilename = './' + execfilename
-		launch(execfilename)
-
-
-def get_cppflags(user_cppflags):
-	global config
-	cppflags = []
-	cppflags += config.common_cppflags
-	cppflags += config.pencil_h_cppflags
-	if config.use_prl:
-		cppflags += config.prl_cppflags
-	else:
-		cppflags += config.ocl_utilities_cppflags
-	if user_cppflags:
-		cppflags += user_cppflags
-	return cppflags
+			compile(file_args, tmpdir, known.o)
 
 
 def has_ext(filename, suffixes):
@@ -690,99 +850,71 @@ def has_ext(filename, suffixes):
 	return False
 
 
-def compile(user_cppflags, user_ppcgargs, pre_cc_args, file_args, post_cc_args, tmpdir, output, known):
+def ppcg_file(filearg, tmpdir, outfile, origdirref):
 	global config
 
-	n_generated = 0
-	#outfiles = []
+	if config.ppcg_disabled:
+		return False,None,None
+
+	infile = os.path.abspath(filearg.input_file)
+	dirname, basename = os.path.split(infile)
+	rootname,ext = os.path.splitext(basename)
+
+	ispencil = has_ext(infile, config.pencil_ext)
+	isc = has_ext(infile, config.c_ext)
+	if not isc and not ispencil:
+		return False,None,None
+
+	if outfile is None and tmpdir is not None:
+			subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
+			outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
+			origdirref += ['-I', dirname]
+
+	exec_ppcg(infile, outfile, ispencil, tmpdir is not None)
+
+	if outfile is None:
+		outfiles = [os.path.abspath(rootname + '_host' + ext)]
+	else:
+		outfiles = [outfile]
+	filearg.generated_file = outfiles
+	return True,isc and not ispencil,ispencil
+
+
+def compile(args, tmpdir, output):
+	global config
+
+	file_args = [arg for arg in args if not arg.is_arg()]
+	stop_after_ppcg = config.cc_disabled and config.ld_disabled
+	has_extc = False
+	has_pencil = False
+
 	origdirrefs = []
-	#anyoptimized = False
 	for filearg in file_args:
 		if filearg.is_arg():
 			continue
 
-		infile = os.path.abspath(filearg.input_file)
-		dirname, basename = os.path.split(infile)
-		rootname,ext = os.path.splitext(basename)
-		ispencil = has_ext(infile, known.pencil_ext)
-		isc = has_ext(infile, known.c_ext)
-		#optext = has_ext(infile, config.opt_exts)
-		#extcext = has_ext(infile, config.extc_exts)
-		#ispencil = isc and optext
-		#file = infile
-		origdirref = []
+		genfile = None
+		if stop_after_ppcg:
+			genfile = output # Last file in pipeline; otherwise use temporary
 
-		if config.use_ppcg and (isc or ispencil):
-			ppcgargs = copy.copy(user_ppcgargs)
-			if ispencil or known.pet_autodetect:
-				ppcgargs += ['--pet-autodetect']
+		success,isextc,ispencil = ppcg_file(filearg, tmpdir, genfile, origdirrefs)
+		has_extc = has_extc or isextc
+		has_pencil = has_pencil or ispencil
 
-			if tmpdir is None:
-				subdir = '.'
-				outfile = os.path.join(subdir, rootname + '.ppcg' + ext)
-				objfile = os.path.join(subdir, rootname + '.ppcg' + ext + '.o')
-			else:
-				subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
-				outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
-				objfile = os.path.join(subdir, basename + '.o')
-				origdirref += ['-I', dirname]
-				ppcgargs += ['--opencl-embed-kernel-code']
+	if stop_after_ppcg:
+		return
 
-			ppcgargs += get_cppflags(user_cppflags)
-			ppcgargs += ['-D__PENCIL__=2']
-			if config.use_prl:
-				ppcgargs += ['--target=prl']
-			else:
-				ppcgargs += ['--target=opencl']
-			ppcgargs += config.pencil_opencl_ppcgflags
-			ppcgargs += [infile]
-			if outfile:
-				ppcgargs += ['-o', outfile]
-			invoke_ppcg(*ppcgargs)
+	cc = config.cc_prog
+	ccargs = assemble_cc_args(args, output, origdirrefs, has_extc, has_pencil)
+	if not config.cc_disabled:
+		invoke(cc, *ccargs)
 
-			# Let gcc compile it
-			ccargs = ['-c', outfile, '-std=gnu99']
-			if known.c:
-				objfile = known.o or os.path.join(dirname, rootname + '.o')
-			ccargs += ['-o', objfile]
-			ccargs += pre_cc_args
-			ccargs += origdirref
-			ccargs += ['-D__PENCIL__=3']
-			ccargs += get_cppflags(user_cppflags)
-			ccargs += config.common_cflags
-			invoke_cc(*ccargs)
+	if not config.use_run:
+		return
 
-			filearg.generated_file = objfile
-			n_generated += 1
-
-		#origdirrefs += origdirref
-
-	ccargs = []
-	ccargs += pre_cc_args
-	#ccargs += origdirrefs
-	ccargs += get_cppflags(user_cppflags)
-	ccargs += config.common_cflags
-
-	if known.std is not None:
-		ccargs += ['-std=' + known.std]
-
-	for filearg in file_args:
-		ccargs += [filearg.arg_or_latest_file()]
-
-	if not config.use_prl:
-		ccargs += config.ocl_utilities_cflags
-
-	ccargs += post_cc_args
-
-	# add linking args behind files
-	ccargs += config.common_lflags
-	if config.use_prl:
-		ccargs += config.prl_lflags
-	ccargs += ['-lOpenCL', '-lm']
-
-	if output:
-		ccargs += ['-o', output]
-	invoke_ld(*ccargs)
+	if output is None:
+		output = os.path.abspath('a.out')
+	launch(output, ccargs)
 
 
 def main():

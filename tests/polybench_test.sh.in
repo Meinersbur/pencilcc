@@ -72,21 +72,21 @@ run_tests () {
 		$prog_orig 2> $output_orig
 
 		if [ $verbose = "yes" ]; then
-			echo ${PENCILCC} \
+			echo ${PENCILCC} --autorpath \
 			"$DIR/$i" "$DIR/utilities/polybench.c" \
 			-I "$DIR/$dir" $CPPFLAGS $CFLAGS $cc_options $ppcg_options $pencil_options $alloptions \
 			-o $prog_opt
 		fi
-		${PENCILCC} \
+		${PENCILCC} --autorpath \
 			"$DIR/$i" "$DIR/utilities/polybench.c" \
 			-I "$DIR/$dir" $CPPFLAGS $CFLAGS $cc_options $ppcg_options $pencil_options $alloptions \
 			-o $prog_opt || exit
 
 		if [ $verbose = "yes" ]; then
 			echo $prog_opt
-			LD_LIBRARY_PATH=`${PENCILCC} --show-run-var=LD_LIBRARY_PATH --noselfupdate` $prog_opt 2>&1 | tee $output_opt
+			$prog_opt 2>&1 | tee $output_opt
 		else
-			LD_LIBRARY_PATH=`${PENCILCC} --show-run-var=LD_LIBRARY_PATH --noselfupdate` $prog_opt 2> $output_opt
+			$prog_opt 2> $output_opt
 		fi
 		cmp $output_orig $output_opt || exit
 	done
