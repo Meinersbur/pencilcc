@@ -577,7 +577,7 @@ def assemble_cpp_args(pencil_level,has_extc,has_pencil):
 		if pencil_level is not None:
 			cppflags += ['-D__PENCIL__=' + str(pencil_level)]
 		if not has_extc:
-			cppflag += ['-D__PENCIL_PURE__']
+			cppflags += ['-D__PENCIL_PURE__']
 	cppflags += ['-D__PENCIL_OPENCL__']
 
 	cppflags += config.common_cppflags
