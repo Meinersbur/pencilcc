@@ -27,7 +27,7 @@ includedir='''@includedir@'''.replace('''${prefix}''', prefix)
 bindir='''@bindir@'''.replace('''${exec_prefix}''', exec_prefix)
 libdir='''@libdir@'''.replace('''${exec_prefix}''', exec_prefix)
 datarootdir='''@datarootdir@'''.replace('''${prefix}''', prefix)
-datadir='''@datadir@'''.replace('''{datarootdir}''',datarootdir).replace('''${prefix}''', prefix)
+datadir='''@datadir@'''.replace('''${datarootdir}''',datarootdir).replace('''${prefix}''', prefix)
 
 PPCG_BUILDDIR='''@PPCG_BUILDDIR@'''
 PPCG_SRCDIR='''@PPCG_SRCDIR@'''
