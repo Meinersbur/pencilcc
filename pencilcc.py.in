@@ -48,18 +48,19 @@ def is_build():
 
 class Configuration:
 	props = ['config', # Informational only
-		  'target', 'tool_args',
-		  #'cpp_flags',
+		  'target',
+		  'cpp_disabled',  'cpp_prog',  'cpp_flags',  'cpp_verbose',
 		  'ppcg_disabled', 'ppcg_prog', 'ppcg_flags', 'ppcg_verbose',
-		  'cc_disabled',   'cc_prog',   'cc_flags',   'cc_verbose', 'cc_isgnu',
-		  'nvcc_prog',
-		  'ld_disabled', #'ld_flags',
-		  'use_run',
+		  'cc_disabled',   'cc_prog',   'cc_flags',   'cc_verbose',   'cc_isgnu',
+		  'nvcc_disabled', 'nvcc_prog', 'nvcc_flags', 'nvcc_verbose',
+		  'ld_disabled',   'ld_prog',   'ld_flags',   'ld_verbose',
+		  'run_enabled',
 		  'pencil_h_cppflags',
 		  'pencil_opencl_ppcgflags',
 		  'ocl_utilities_cppflags', 'ocl_utilities_cflags', 
 		  'prl_disabled', 'prl_cppflags', 'prl_lflags',
 		  'common_cppflags','common_cflags','common_lflags',
+		  'pencil_h', 'pencil_ppcg_h',
 		  'opencl_embed_kernel_code','std','pencil_ext','c_ext', 'autorpath']
 
 	def __init__(self):
@@ -77,27 +78,33 @@ class Configuration:
 		self.config = 'system'
 		self.target = 'prl'
 
-		self.tool_args = []
-
-		#self.cpp_flags = []
+		self.cpp_disabled = False
+		self.cpp_prog = 'cpp'
+		self.cpp_flags = []
+		self.cpp_verbose = 0
 
 		self.ppcg_disabled = False
 		self.ppcg_prog = 'ppcg'
 		self.ppcg_flags = []
 		self.ppcg_verbose = 0
 
-		self.cc_isgnu = None
 		self.cc_disabled = False
 		self.cc_prog = 'cc'
 		self.cc_flags = []
 		self.cc_verbose = 0
+		self.cc_isgnu = None
+
+		self.nvcc_disabled = False
+		self.nvcc_prog = 'nvcc'
+		self.nvcc_flags = []
+		self.nvcc_verbose = 0
 
 		self.ld_disabled = False
-		#self.ld_prog = 'cc'
-		#self.ld_flags = []
-		#self.ld_verbose = 0
+		self.ld_prog = 'cc' # Used?
+		self.ld_flags = [] # Used?
+		self.ld_verbose = 0 # Used?
 
-		self.use_run = False
+		self.run_enabled = False
 
 		self.pencil_h_cppflags = []
 		self.pencil_opencl_ppcgflags = ['--opencl-include-file=pencil_opencl.h']
@@ -112,6 +119,9 @@ class Configuration:
 		self.common_cppflags = []
 		self.common_cflags = []
 		self.common_lflags = []
+
+		self.pencil_h = 'pencil.h'
+		self.pencil_ppcg_h = 'pencil_ppcg.h'
 
 		self.opencl_embed_kernel_code = None
 		self.std='c99'
@@ -155,6 +165,9 @@ class Configuration:
 		self.common_cflags = []
 		self.common_lflags = []
 
+		self.pencil_h = os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil.h')
+		self.pencil_ppcg_h = os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil_ppcg.h')
+
 
 	def install_config(self):
 		self.config = 'install'
@@ -178,6 +191,9 @@ class Configuration:
 		self.common_cflags = []
 		self.common_lflags = ['-L', libdir]
 
+		self.pencil_h = os.path.join(includedir,'pencil.h')
+		self.pencil_ppcg_h = os.path.join(includedir,'pencil_ppcg.h')
+
 
 def show_config(config):
 	if is_build():
@@ -194,6 +210,7 @@ def show_config(config):
 		else:
 			s=str(val)
 		print(prop,'=',s)
+
 
 system_config = None
 def get_system_config():
@@ -242,7 +259,7 @@ print_commands_baseonly = False
 config = Configuration()
 
 
-def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,prefix='$ '):
+def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,prefix='#$ '):
 	if print_commands or force:
 		shortcmd = os.path.basename(cmd) if print_commands_baseonly else shlex.quote(cmd)
 		setenvs = []
@@ -326,6 +343,7 @@ def add_captured_cc_args(defaultcfg, parser):
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
+	parser.add_argument('-x', nargs=2, help=argparse.SUPPRESS) # TODO: Implement support
 	parser.add_argument('-c', action='store_true', default=False, help=argparse.SUPPRESS)
 	parser.add_argument('-std', metavar='STD', choices=['gnu99', 'c99'],
 		help="C standard mode (default: " + defaultcfg.std + ")")
@@ -351,22 +369,41 @@ def parsecmd(defaultcfg, is_tool):
 	parser.add_argument('-v', '--verbose', action='count', default=0, help="More verbose output")
 	parser.add_argument('--pencil-config', choices=['system', 'build', 'install'], help="Introspection to use")
 
-	parser.add_argument('--keep', action='store_true', help="Keep temporary files next to files to compile")
+	parser.add_argument('--keep', '--save-temps', action='store_true', help="Keep temporary files next to files to compile")
 	parser.add_argument('--keep-dir', action='store_true', help="Do not delete temporary directory when finished")
 	parser.add_argument('--pencil-tmpdir', help="Directory to use for temporary files")
+
+	parser.add_argument('--cpp',dest='cpp',action='store_true')
+	parser.add_argument('--no-cpp',dest='cpp',action='store_false')
+	parser.add_argument('--cpp-prog',metavar='CPP',default=None,help="Path to preprocessor executable (default: " + defaultcfg.cpp_prog + ")")
+	parser.add_argument('--cpp-flag', '-Xpreprocessor',action='append',help="Additional argument for preprocessor (passed literally)")
+	parser.add_argument('--cpp-flags',action='append',help="Additional arguments for preprocessor (will be unescaped")
 
 	parser.add_argument('--ppcg',dest='ppcg',action='store_true')
 	parser.add_argument('--no-ppcg',dest='ppcg',action='store_false')
 	parser.add_argument('--ppcg-prog',metavar='PPCG',default=None,help="Path to ppcg executable (default: " + defaultcfg.ppcg_prog + ")")
-	parser.add_argument('--ppcg-arg',action='append',help="Additional argument for ppcg")
-	parser.add_argument('--ppcg-args',action='append',help="Additional arguments for ppcg")
+	parser.add_argument('--ppcg-flag', '-Xppcg',action='append',help="Additional argument for ppcg (passed literally)")
+	parser.add_argument('--ppcg-flags',action='append',help="Additional arguments for ppcg (will be unescaped")
 
 	if not is_tool:
+		# Used for compiling .c (ppcg output), linking (--target=prl or opencl), non-pencil omput files (eg. .c, .cpp, non-existing) are intentionally passed to the linker
 		parser.add_argument('--cc',dest='cc',action='store_true')
 		parser.add_argument('--no-cc',dest='cc',action='store_false')
-		parser.add_argument('--cc-prog',help="Path to C compiler executable (default:" + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
-		parser.add_argument('--cc-arg',action='append',help="Additional compiler argument")
-		parser.add_argument('--cc-args',action='append',help="Additional compiler arguments")
+		parser.add_argument('--cc-prog',help="Path to C compiler executable (default: " + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
+		parser.add_argument('--cc-flag', action='append',help="Additional compiler argument (passed literally)") # How to pass -Xcompiler when linking?
+		parser.add_argument('--cc-flags',action='append',help="Additional compiler arguments (will be unescaped)")
+
+	# Used for compiling .cu files (ppcg output), linking (--target=cuda)
+	# Is disabled by --no-cc as well
+	parser.add_argument('--nvcc-prog',help="Path to nvcc compiler executable (default: " + defaultcfg.nvcc_prog + ")")
+	parser.add_argument('--nvcc-flag', '-Xnvcc', action='append',help="Additional nvcc argument (passed literally)")
+	parser.add_argument('--nvcc-flags',action='append',help="Additional nvcc arguments (will be unescaped)")
+
+	#parser.add_argument('--ld',dest='ld',action='store_true')
+	#parser.add_argument('--no-ld', dest='ld', action='store_false')
+	#parser.add_argument('--ld-prog')
+	#parser.add_argument('--ld-flag', '-Xlinker', action='append')
+	#parser.add_argument('--ld-flags', action='append')
 
 	parser.add_argument('--autorpath', action='store_true', help="Set linker rpath to runtime libraries.")
 	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action='append', default=defaultcfg.pencil_ext,
@@ -378,13 +415,12 @@ def parsecmd(defaultcfg, is_tool):
 	parser.add_argument('--noselfupdate', dest='selfupdate', action='store_false', default=True,
 		help="Do not try to update yourself" if is_build() else argparse.SUPPRESS)
 
-	#TODO: --run clashes with a nvcc command line option
 	parser.add_argument('--run',    dest='run', action='store_true', help="Run executable after compilation")
 	parser.add_argument('--no-run', dest='run', action='store_false')
-	parser.set_defaults(ppcg=None,cc=None,run=None)
+	parser.set_defaults(ppcg=None,cpp=None,cc=None,nvcc=None,run=None)
 
 	# Passed to PPCG only
-	parser.add_argument('--target', metavar='TARGET', choices=['prl', 'opencl'], default='prl')
+	parser.add_argument('--target', metavar='TARGET', choices=['prl', 'opencl', 'cuda'], default='prl')
 	if not is_tool:
 		parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[], help=argparse.SUPPRESS)
 		parser.add_argument('--no-isl-schedule-separate-components', action='store_true', help=argparse.SUPPRESS)
@@ -450,6 +486,13 @@ def error_exit(msg):
 def get_config_from_argparse(known):
 	config = Configuration()
 
+	if known.cpp is not None:
+		config.cpp_disabled = not known.cpp
+	if known.cpp_prog is not None:
+		config.cpp_prog = known.cpp_prog
+	if known.verbose is not None:
+		config.cpp_verbose = max(0, known.verbose - 1)
+
 	if known.ppcg is not None:
 		config.ppcg_disabled = not known.ppcg
 	if known.ppcg_prog is not None:
@@ -459,15 +502,20 @@ def get_config_from_argparse(known):
 
 	if known.cc is not None:
 		config.cc_disabled = not known.cc
-		config.ld_disabled = not known.cc
 	if known.cc_prog is not None:
 		config.cc_prog = known.cc_prog
 	if known.verbose is not None:
 		config.cc_verbose = max(0, known.verbose - 1)
 	config.cc_isgnu = None # Unknown; will test later
 
+	if known.nvcc_prog is not None:
+	   config.nvcc_prof = known.nvcc_prog
+
 	if known.target == 'opencl':
 		config.target = 'opencl'
+		config.prl_disabled = True
+	elif known.target == 'cuda':
+		config.target='cuda'
 		config.prl_disabled = True
 	else:
 		config.target = 'prl'
@@ -479,17 +527,17 @@ def get_config_from_argparse(known):
 		config.autorpath = known.autorpath
 
 	# If any of these flags is true, set all of them (so user does not have to switch off passes explicitely)
-	if known.cc or known.ppcg  or known.run:
+	if known.cc or known.ppcg or known.run:
 		config.ppcg_disabled = known.ppcg!=True
 		config.cc_disabled = known.cc!=True
-		config.use_run = known.run==True
+		config.run_enabled = known.run==True
 	else:
 		if known.ppcg is not None:
 			config.ppcg_disabled = not known.ppcg
 		if known.cc is not None:
 			config.cc_disabled = not known.cc
 		if known.run is not None:
-			config.use_run = known.run
+			config.run_enabled = known.run
 
 	if known.pencil_ext is not None:
 		config.pencil_ext = known.pencil_ext
@@ -499,6 +547,7 @@ def get_config_from_argparse(known):
 	config.cpp_flags = []
 	config.ppcg_flags = []
 	config.cc_flags = []
+	config.nvcc_flags = []
 
 	for incfile in known.opencl_include_file:
 		config.ppcg_flags += ['--opencl-include-file=' + incfile]
@@ -531,14 +580,25 @@ def get_config_from_argparse(known):
 	if known.std is not None:
 		config.std = known.std
 
-	if known.cc_args is not None:
-		config.cc_flags += [s for args in known.cc_args for s in shlex.split(args)]
-	if known.cc_arg is not None:
-		config.cc_flags += known.cc_arg
-	if known.ppcg_args is not None:
-		config.ppcg_flags += [s for args in known.ppcg_args for s in shlex.split(args)]
-	if known.ppcg_arg is not None:
-		config.ppcg_flags += known.ppcg_arg
+	if known.cpp_flags is not None:
+		config.cpp_flags += [s for args in known.cpp_flags for s in shlex.split(args)]
+	if known.cpp_flag is not None:
+		config.cpp_flags += known.cpp_flag
+
+	if known.ppcg_flags is not None:
+		config.ppcg_flags += [s for args in known.ppcg_flags for s in shlex.split(args)]
+	if known.ppcg_flag is not None:
+		config.ppcg_flags += known.ppcg_flag
+
+	if known.cc_flags is not None:
+		config.cc_flags += [s for args in known.cc_flags for s in shlex.split(args)]
+	if known.cc_flag is not None:
+		config.cc_flags += known.cc_flag
+
+	if known.nvcc_flags is not None:
+		config.nvcc_flags += [s for args in known.nvcc_flags for s in shlex.split(args)]
+	if known.nvcc_flag is not None:
+		config.nvcc_flags += known.nvcc_flag
 
 	return config
 
@@ -569,100 +629,398 @@ def extract_library_paths(args):
 	return libpaths
 
 
-def assemble_cpp_args(pencil_level,has_extc,has_pencil):
+def changeext(filename,newext):
+	rootname,oldext = os.path.splitext(filename)
+	return rootname + newext
+
+
+def common_cpp_args(pencil_level,isc,ispencil):
 	global config
 	cppflags = []
 
-	if has_extc or has_pencil:
+	if isc or ispencil:
 		if pencil_level is not None:
 			cppflags += ['-D__PENCIL__=' + str(pencil_level)]
-		if not has_extc:
-			cppflags += ['-D__PENCIL_PURE__']
-	cppflags += ['-D__PENCIL_OPENCL__']
+
+		if config.target == 'cuda':
+			cppflags += ['-D__PENCIL_CUDA__']
+		else:
+			cppflags += ['-D__PENCIL_OPENCL__']
+		if config.target=='prl':
+			cppflags += ['-D__PENCIL_PRL__']
+
+	if ispencil:
+		cppflags += ['-D__PENCIL_PURE__']
 
 	cppflags += config.common_cppflags
+
 	cppflags += config.pencil_h_cppflags
-	if config.prl_disabled:
-		cppflags += config.ocl_utilities_cppflags
-	else:
-		cppflags += config.prl_cppflags
+	if isc or ispencil:
+		if config.target=='cuda':
+			pass
+		elif config.prl_disabled:
+			cppflags += config.ocl_utilities_cppflags
+		else:
+			cppflags += config.prl_cppflags
 	cppflags += config.cpp_flags
 
 	return cppflags
 
 
-def assemble_ppcg_args(infile, outfile, ispencil, force_embed):
+def common_cc_args(isc,ispencil):
 	global config
-	ppcgargs = []
+	ccflags = []
 
+	ccflags += common_cpp_args(pencil_level=3 if isc or ispencil else None,isc=isc,ispencil=ispencil)
+	ccflags += config.common_cflags
+	ccflags += config.cc_flags
+
+	if (isc or ispencil) and config.cc_isgnu:
+		ccflags += ['-Wno-attributes']                    # __attribute__((pencil_access)) not removed by ppcg
+		ccflags += ['-Wno-implicit-function-declaration'] # __pencil_use/def/maybe left in summary functions
+
+	return ccflags
+
+
+# These are flags for the compiler driver which passes flags to the linker
+def common_cc_ld_args():
+	global config
+	ldflags = []
+
+	if config.target !='cuda':
+		ldflags += config.common_lflags
+		if config.prl_disabled :
+			ldflags += config.ocl_utilities_cflags
+		else:
+			ldflags += config.prl_lflags
+		ldflags += ['-lOpenCL', '-lm']
+
+	if config.autorpath:
+		libpaths = extract_library_paths(ldflags)
+		for libpath in libpaths:
+			ldflags += ['-Xlinker', '-rpath', '-Xlinker', libpath] # -Wl is not recognized by nvcc
+
+	return ldflags
+
+
+def assemble_cpp_args(infile, outfile, isc, ispencil):
+	global config
+
+	cppargs = []
+	cppargs += verbosity(config.cpp_verbose)
+	if infile is not None:
+		cppargs += [infile]
+
+	cppargs += common_cpp_args(pencil_level=1,isc=isc,ispencil=ispencil)
+	cppargs += ['-D__PENCIL_CPP__']
+
+	if outfile is not None:
+		cppargs += ['-o', outfile]
+	return cppargs
+
+def exec_cpp(infile, outfile, isc, ispencil):
+	global config
+	cppargs = assemble_cpp_args(infile=infile,outfile=outfile,isc=isc,ispencil=ispencil)
+	invoke(config.cpp_prog, *cppargs)
+
+
+def assemble_ppcg_args(infile, outfile, isc, ispencil,  force_embed):
+	global config
+
+	ppcgargs = []
 	ppcgargs += verbosity(config.ppcg_verbose)
 	if infile is not None:
 		ppcgargs += [infile]
-	ppcgargs += assemble_cpp_args(2,not ispencil,ispencil)
+
+	ppcgargs += common_cpp_args(pencil_level=2,isc=isc,ispencil=ispencil)
+	ppcgargs += ['-D__PENCIL_PPCG__']
+
 	ppcgargs += ['--target=' + config.target]
 	if ispencil:
 		ppcgargs += ['--pet-autodetect']
-	if config.opencl_embed_kernel_code or force_embed:
+	if (config.target != 'cuda') and (config.opencl_embed_kernel_code or force_embed):
 		ppcgargs += ['--opencl-embed-kernel-code']
-	ppcgargs += config.pencil_opencl_ppcgflags
+	if config.target != 'cuda':
+		ppcgargs += config.pencil_opencl_ppcgflags
 	ppcgargs += config.ppcg_flags
+
 	if outfile is not None:
 		ppcgargs += ['-o', outfile]
 	return ppcgargs
 
+def exec_ppcg(infile, outfile, isc, ispencil, force_embed):
+	global config
+	ppcgargs = assemble_ppcg_args(infile=infile, outfile=outfile, isc=isc, ispencil=ispencil,force_embed=force_embed)
+	invoke(config.ppcg_prog, *ppcgargs)
 
-def exec_ppcg(infile, outfile, ispencil, force_embed):
+
+# To compile _host.c and .pencil.c (with --no-ppcg)
+def assemble_cc_args(infile, outfile, isc, ispencil):
 	global config
 
-	ppcg_args = assemble_ppcg_args(infile, outfile, ispencil, force_embed)
-	invoke(config.ppcg_prog, *ppcg_args)
-
-
-def assemble_cc_args(args, outfile, origdirrefs, has_extc, has_pencil):
-	global config
-
-	ccargs = []
+	ccargs = ['-c']
 	ccargs += verbosity(config.cc_verbose)
-	if origdirrefs is not None:
-		ccargs += origdirrefs
-	ccargs += assemble_cpp_args(3, has_extc, has_pencil)
-	ccargs += config.common_cflags
+	if infile is not None:
+		ccargs += [infile]
 
-	# TODO: Test if GNU/clang before appending such flags
-	if config.cc_isgnu:
-		if config.std is not None:
+	if config.cc_isgnu and (config.std is not None):
 			ccargs += ['-std=' + config.std]
-		#ccargs += ['-Wno-attributes']                    # __attribute__((pencil_access)) not removed by ppcg
-		#ccargs += ['-Wno-implicit-function-declaration'] # __pencil_use/def/maybe left in summary functions
+	ccargs += common_cc_args(isc=isc,ispencil=ispencil)
 
-	ccargs += [s for filearg in args for s in filearg.arg_or_latest_file()]
+	if outfile is not None:
+		ccargs += ['-o', outfile]
+	return ccargs
+
+def exec_cc(infile, outfile, isc, ispencil):
+	global config
+	ccargs = assemble_cc_args(infile=infile, outfile=outfile, isc=isc, ispencil=ispencil)
+	invoke(config.cc_prog, *ccargs)
+
+
+def exec_cc_ld(args,outfile):
+	global config
+	ldargs = assemble_cc_ld_args(args=args, outfile=outfile)
+	invoke(config.cc_prog, *ldargs)
+
+
+# For compiling _kernel.cu
+# nvcc calls gcc to call ld
+def assemble_nvcc_cc_args(infile, outfile):
+	global config
+
+	nvccargs = ['--compile']
+	nvccargs += verbosity(config.nvcc_verbose)
+	if infile is not None:
+		nvccargs += [infile]
+
+	ccargs = common_cc_args(isc=False,ispencil=False)
+	compatible,incompatible = filter_nvcc_args(ccargs)
+	nvccargs += compatible
+	for flag in incompatible:
+		nvccargs += ['-Xcompiler', flag]
+	nvccargs += config.nvcc_flags
+
+	if outfile is not None:
+		nvccargs += ['-o', outfile]
+	return nvccargs
+
+def exec_nvcc_cc(infile,outfile):
+	global config
+	nvccargs = assemble_nvcc_cc_args(infile=infile,outfile=outfile)
+	invoke(config.nvcc_prog, *nvccargs)
+
+
+# To combine all previous artifacts, ie. object files (.o), non-pencil sources (.cpp, etc), non-existing files
+def assemble_cc_ld_args(args, outfile):
+	global config
 
 	ldargs = []
-	if config.ld_disabled:
-		ccargs += ['-c']
-	else:
-		# add linking args behind files
-		ldargs += config.common_lflags
-		if config.prl_disabled:
-			ldargs += config.ocl_utilities_cflags
-		else:
-			ldargs += config.prl_lflags
-		ldargs += ['-lOpenCL', '-lm']
+	ldargs += verbosity(config.ld_verbose)
 
-	if config.autorpath:
-		libpaths = extract_library_paths(ldargs)
-		for libpath in libpaths:
-			ldargs += ['-Wl,-rpath', '-Wl,' + libpath]
+	if config.cc_isgnu and (config.std is not None):
+			ldargs += ['-std=' + config.std]
+	ldargs += common_cc_args(isc=False,ispencil=False)
 
-	outarg = []
+	if args is not None:
+		for arg in args:
+			if arg.is_arg():
+				ldargs += [arg.arg]
+			else:
+				ldargs += arg.latest_objects()
+
+	ldargs += common_cc_ld_args()
+
 	if outfile is not None:
-		outarg += ['-o', outfile]
+		ldargs += ['-o', outfile]
+	return ldargs
 
-	return ccargs + ldargs + config.cc_flags + outarg
+
+def exec_cc_ld(args,outfile):
+	global config
+	ldargs = assemble_cc_ld_args(args=args,outfile=outfile)
+	invoke(config.cc_prog, *ldargs)
 
 
-def launch(prog, ccargs):
-	ldlibrary = extract_library_paths(ccargs)
+def assemble_nvcc_ld_args(args, outfile):
+	global config
+
+	nvccargs = []
+	nvccargs += verbosity(config.nvcc_verbose)
+
+	if config.std is not None:
+		nvccargs += ['-Xcompiler', '-std='+config.std]
+
+	ccargs = common_cc_args(isc=False,ispencil=False)
+	compatible,incompatible = filter_nvcc_args(ccargs)
+	nvccargs += compatible
+	for flag in incompatible:
+		nvccargs += ['-Xcompiler', flag]
+
+	if args is not None:
+		toolargs = []
+		for arg in args:
+			if arg.is_arg():
+				toolargs += [arg.arg]
+			else:
+				toolargs += arg.latest_objects()
+		nvccargs += toolargs
+
+	ldargs = common_cc_ld_args()
+	nvccargs += ldargs	# FIXME: There seems to be a way to pass arguments to gcc when linking
+
+	nvccargs += config.nvcc_flags
+
+	if outfile is not None:
+		nvccargs += ['-o', outfile]
+	return nvccargs
+
+def exec_nvcc_ld(args,outfile):
+	global config
+	nvccargs = assemble_nvcc_ld_args(args=args,outfile=outfile)
+	invoke(config.nvcc_prog, *nvccargs)
+
+
+def prepend_header(infile, outfile, header):
+	global config
+	if outfile is None:
+		outfile = changeext(infile, '_stage.c')
+	with open(outfile, 'w') as out:
+		out.write('#include <' + header + '>\n')
+		with open(infile, 'r') as instream:
+			shutil.copyfileobj(instream, out)
+	return outfile
+
+
+def cpp_file(filearg, outfile):
+	global config
+	if config.cpp_disabled:
+		return
+
+	exec_cpp(infile=filearg.input_file, outfile=outfile, isc=filearg.isc, ispencil=filearg.ispencil)
+
+	if outfile is None:
+		outfile = changeext(outfile,'.i')
+	filearg.cpp_i = outfile
+
+
+def ppcg_file(filearg, outfile, force_embed):
+	global config
+	if config.ppcg_disabled:
+		return
+
+	infile = filearg.latest_host_source()
+	exec_ppcg(infile=infile, outfile=outfile,isc=filearg.isc, ispencil=filearg.ispencil, force_embed=force_embed)
+
+	if outfile is None:
+		rootname,ext = os.path.splitext(infile)
+		filearg.ppcg_host_c = os.path.abspath(rootname + '_host.c')
+	else:
+		rootname,ext = os.path.splitext(outfile)
+		filearg.ppcg_host_c = outfile
+
+	# ppcg indeed writes all files (except the .c specified by -o) extinto the current directory
+	if config.target == 'cuda':
+		filearg.ppcg_kernel_cu = os.path.abspath(rootname + '_kernel.cu')
+		filearg.ppcg_kernel_hu = os.path.abspath(rootname + '_kernel.hu')
+	else:
+		filearg.ppcg_kernel_cl = os.path.abspath(rootname + '_kernel.cl')
+
+
+def cc_file(infile, outfile, isc, ispencil):
+	global config
+	if config.cc_disabled:
+		return
+
+	exec_cc(infile=infile,outfile=outfile,isc=isc,ispencil=ispencil)
+
+	if outfile is None:
+		outfile = changeext(infile, '.o')
+	return outfile
+
+
+def nvcc_cc_file(filearg, outfile):
+	global config
+	if config.cc_disabled:
+		return
+
+	exec_nvcc_cc(infile=filearg.ppcg_kernel_cu, outfile=outfile)
+
+	if outfile is None:
+		filearg.nvcc_kernel_o = os.path.abspath(rootname + '.o')
+	else:
+		filearg.nvcc_kernel_o = outfile
+
+
+def cc_ld_file(args,outfile):
+	global config
+	if config.ld_disabled:
+		return
+
+	exec_cc_ld(args,outfile)
+
+	if outfile is None:
+		outfile = changeext(infile, '.o')
+	return outfile
+
+
+def nvcc_ld_file(args,outfile):
+	global config
+	if config.ld_disabled:
+		return
+
+	exec_nvcc_ld(args, outfile)
+
+	if outfile is None:
+		outfile = changeext(infile, '.o')
+	return outfile
+
+
+def filter_nvcc_args(ldargs):
+	i=0
+	known = []
+	unknown = []
+
+	# Cannot use argparse because order of -l and file parameters matter
+	while i < len(ldargs):
+		ldarg = ldargs[i]
+		if ldarg.startswith('-l') or ldarg.startswith('-L') or ldarg.startswith('-D') or ldarg.startswith('-I') or ldarg.startswith('-o'):
+			if len(ldarg)==2:
+				known += [ldarg, ldargs[i+1]]
+				i+=2
+				continue
+			else:
+				known += [ldarg]
+				i+=1
+				continue
+		elif ldarg == '-Xlinker':
+			known += [ldarg, ldargs[i+1]]
+			i+=2
+			continue
+		elif ldarg.startswith('-'):
+			unknown += [ldarg]
+			i+=1
+			continue
+
+		# File parameter
+		known.append(ldarg)
+		i+=1
+
+	return known,unknown
+
+
+def ld_file(args, outfile):
+	# ld cannot depend on has_extc, has_pencil, has_cuda because the build tool may have invoked -c before
+	global config
+
+	if config.target=='cuda':
+		return nvcc_ld_file(args,outfile)
+	else:
+		return cc_ld_file(args,outfile)
+
+
+def launch(prog):
+	ldargs = common_cc_ld_args()
+	ldlibrary = extract_library_paths(ldargs)
 	invoke(prog,appendenv={'LD_LIBRARY_PATH': ldlibrary})
 
 
@@ -679,7 +1037,7 @@ int main() {
 }
 			""")
 	try:
-		invoke(cc,'-std=c99','-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+		invoke(cc, '-std=c99', '-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 	except:
 		return False
 	return True
@@ -692,23 +1050,63 @@ def err_exit(msg):
 
 class CCArg:
 	arg = None
+
 	input_file = None
-	generated_file = None
+	isc = False
+	ispencil = False
+
+	cpp_i = None
+
+	stage_i = None
+
+	ppcg_host_c = None
+	ppcg_kernel_cl = None
+	ppcg_kernel_cu = None
+	ppcg_kernel_hu = None
+
+	nvcc_kernel_o = None
+	cc_host_o = None
+
+	ld_exe = None
+
 
 	def __init__(self, arg, is_input):
+		global config
+
 		if is_input:
 			self.input_file = arg
+			self.ispencil = has_ext(arg, config.pencil_ext)
+			self.isc = not self.ispencil and has_ext(arg, config.c_ext)
 		else:
 			self.arg = arg
+
 
 	def is_arg(self):
 		return self.arg is not None
 
-	def latest_file(self):
-		return self.generated_file if self.generated_file is not None else [self.input_file]
 
-	def arg_or_latest_file(self):
-		return [self.arg] if self.arg is not None else self.latest_file()
+	def latest_host_source(self):
+		if self.ppcg_host_c is not None:
+			return self.ppcg_host_c
+		if self.stage_i is not None:
+			return self.stage_i
+		if self.cpp_i is not None:
+			return self.cpp_i
+		if (self.isc or self.ispencil) and self.input_file is not None:
+			return self.input_file
+
+	def latest_objects(self):
+		objects = []
+		if self.cc_host_o is not None:
+			objects += [self.cc_host_o]
+		if self.nvcc_kernel_o is not None:
+			objects += [self.nvcc_kernel_o]
+
+		if not objects:
+			return [self.input_file]
+		return objects
+
+
 
 def print_list(list,listsep,shellargs):
 	print(listsep.join([shlex.quote(s) for s in list]))
@@ -754,7 +1152,7 @@ def process(is_tool):
 	if known.selfupdate and is_build():
 		invoke('make', os.path.basename(script),cwd=os.path.dirname(script),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
-		cmdline = [ x for x in cmdline if x !=  '--show-invocation'] # Do not show invocation a second time
+		cmdline = [x for x in cmdline if x !=  '--show-invocation'] # Do not show invocation a second time
 		invoke(*cmdline)
 		return
 
@@ -814,12 +1212,12 @@ def process(is_tool):
 		if n_files<=0:
 			err_exit("No input files")
 
-		if config.ppcg_disabled and config.cc_disabled and config.ld_disabled and not config.use_run:
+		if config.ppcg_disabled and config.cc_disabled and config.ld_disabled and not config.run_enabled:
 			print("Toolchain is empty; nothing to do")
 			exit(0)
 		elif not config.ppcg_disabled and config.cc_disabled and not config.ld_disabled:
 			err_exit("Cannot link generated source without compiling it")
-		elif config.use_run and config.ld_disabled:
+		elif config.run_enabled and config.ld_disabled:
 			err_exit("Cannot run program without linking")
 		elif not config.ppcg_disabled and config.cc_disabled and (n_files!=1) and known.o is not None:
 			err_exit("Can just take one input file")
@@ -850,71 +1248,70 @@ def has_ext(filename, suffixes):
 	return False
 
 
-def ppcg_file(filearg, tmpdir, outfile, origdirref):
-	global config
+def mktempwd(islast, outfile, tmpdir, prefix, targetfilename):
+	if islast:
+		return outfile
 
-	if config.ppcg_disabled:
-		return False,None,None
-
-	infile = os.path.abspath(filearg.input_file)
-	dirname, basename = os.path.split(infile)
-	rootname,ext = os.path.splitext(basename)
-
-	ispencil = has_ext(infile, config.pencil_ext)
-	isc = has_ext(infile, config.c_ext)
-	if not isc and not ispencil:
-		return False,None,None
-
-	if outfile is None and tmpdir is not None:
-			subdir = tempfile.mkdtemp(prefix='ppcg.', dir=tmpdir)
-			outfile = os.path.join(subdir, basename) # We try to leave the name unchanged, in case a __FILE__ is used in there
-			origdirref += ['-I', dirname]
-
-	exec_ppcg(infile, outfile, ispencil, tmpdir is not None)
-
-	if outfile is None:
-		outfiles = [os.path.abspath(rootname + '_host' + ext)]
+	if tmpdir is None:
+		# with --keep
+		return targetfilename
 	else:
-		outfiles = [outfile]
-	filearg.generated_file = outfiles
-	return True,isc and not ispencil,ispencil
+		subdir = tempfile.mkdtemp(prefix='.' + prefix, dir=tmpdir)
+		basename = os.path.basename(targetfilename)
+		outfile = os.path.join(subdir, basename)
 
 
 def compile(args, tmpdir, output):
 	global config
 
 	file_args = [arg for arg in args if not arg.is_arg()]
-	stop_after_ppcg = config.cc_disabled and config.ld_disabled
+	stop_after_cpp  = not config.run_enabled and config.ld_disabled and config.cc_disabled and config.ppcg_disabled
+	stop_after_ppcg = not config.run_enabled and config.ld_disabled and config.cc_disabled
+	stop_after_cc   = not config.run_enabled and config.ld_disabled
+	stop_after_ld   = not config.run_enabled
 	has_extc = False
 	has_pencil = False
+	has_cuda = False
 
-	origdirrefs = []
 	for filearg in file_args:
 		if filearg.is_arg():
 			continue
+		if not filearg.isc and not filearg.ispencil:
+			continue
 
-		genfile = None
+		ifile = mktempwd(stop_after_cpp, output, tmpdir, 'cpp', changeext(filearg.input_file, '.i'))
+		cpp_file(filearg=filearg, outfile=ifile)
+		if stop_after_cpp:
+			continue
+
+		# Essentially because ppcg has no -inlude cmdline option, but also will forward it cc/nvcc
+		stagefile = mktempwd(stop_after_cpp, output, tmpdir, 'stage', changeext(filearg.input_file, '_stage.i'))
+		filearg.stage_i = prepend_header(infile=filearg.latest_host_source(), outfile=stagefile, header=config.pencil_ppcg_h)
+
+		hostfile = mktempwd(stop_after_ppcg, output, tmpdir, 'ppcg', changeext(filearg.input_file, '_host.c'))
+		ppcg_file(filearg=filearg, outfile=hostfile,force_embed=tmpdir is not None)
 		if stop_after_ppcg:
-			genfile = output # Last file in pipeline; otherwise use temporary
+			continue
 
-		success,isextc,ispencil = ppcg_file(filearg, tmpdir, genfile, origdirrefs)
-		has_extc = has_extc or isextc
-		has_pencil = has_pencil or ispencil
+		if filearg.ppcg_kernel_cu is not None:
+			kernelofile = mktempwd(False, output, tmpdir, 'nvcc', changeext(filearg.input_file, '_kernel.o'))
+			nvcc_cc_file(filearg=filearg, outfile= kernelofile)
+			has_cuda = True
 
-	if stop_after_ppcg:
+		host_c = filearg.latest_host_source()
+		if host_c is not None:
+			hostofile = mktempwd(stop_after_cc, output, tmpdir, 'ld', changeext(filearg.input_file, '_host.o'))
+			filearg.cc_host_o = cc_file(infile=host_c,outfile= hostofile,isc=filearg.isc and (config.target!='cuda'),ispencil=filearg.ispencil and (config.target!='cuda'))
+
+	if stop_after_cc:
+		return # TODO: Check there is just one input file
+
+	exefile = ld_file(file_args, output)
+
+	if not config.run_enabled:
 		return
 
-	cc = config.cc_prog
-	ccargs = assemble_cc_args(args, output, origdirrefs, has_extc, has_pencil)
-	if not config.cc_disabled:
-		invoke(cc, *ccargs)
-
-	if not config.use_run:
-		return
-
-	if output is None:
-		output = os.path.abspath('a.out')
-	launch(output, ccargs)
+	launch(exefile, ccargs)
 
 
 def main():
