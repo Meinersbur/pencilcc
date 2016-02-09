@@ -7,4 +7,4 @@ echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
-${PENCILCC} -vv -O3 "${TESTSRCDIR}/simple.c" --target=cuda --run -Werror
+${PENCILCC} -vv -O3 "${TESTSRCDIR}/__pencil_assume.c" --target=cuda --run -Werror

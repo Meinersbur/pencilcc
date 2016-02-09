@@ -1,7 +1,5 @@
-
 #include <stdio.h>
 #include <sys/time.h>
-
 
 void kernel(int n, float A[static const restrict n]) {
 #pragma scop

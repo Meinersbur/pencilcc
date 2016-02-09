@@ -378,7 +378,7 @@ def parsecmd(defaultcfg, is_tool):
 	parser.add_argument('--pencil-config', choices=['system', 'build', 'install'], help="Introspection to use")
 
 	parser.add_argument('--keep', '-save-temps', action='store_true', help="Keep temporary files next to files to compile")
-	parser.add_argument('--keep-dir', action='store_true', help="Do not delete temporary directory when finished")
+	parser.add_argument('--keep-dir', help="Directory for temporary files")
 	parser.add_argument('--pencil-tmpdir', help="Directory to use for temporary files")
 
 	parser.add_argument('--cpp',dest='cpp',action='store_true')
@@ -520,6 +520,8 @@ def get_config_from_argparse(known):
 
 	if known.nvcc_prog is not None:
 	   config.nvcc_prof = known.nvcc_prog
+	if known.verbose is not None:
+		config.nvcc_verbose = max(0, known.verbose - 1)
 
 	if known.run is not None:
 		config.run_enabled = known.run
@@ -663,8 +665,8 @@ def common_cpp_args(pencil_level,isc,ispencil):
 		cppflags += ['-D__PENCIL_PURE__']
 
 	cppflags += config.common_cppflags
-
 	cppflags += config.pencil_h_cppflags
+
 	if isc or ispencil:
 		if config.target=='cuda':
 			pass
@@ -680,11 +682,11 @@ def common_cc_args(args,isc,ispencil):
 	global config
 	ccflags = []
 
-	if isc or ispencil:
-		ccflags += common_cpp_args(pencil_level=3 if isc or ispencil else None,isc=isc,ispencil=ispencil)
-		ccflags += config.common_cflags
-		ccflags += config.cc_flags
+	ccflags += common_cpp_args(pencil_level=3 if isc or ispencil else None,isc=isc,ispencil=ispencil)
+	ccflags += config.common_cflags
+	ccflags += config.cc_flags
 
+	if isc or ispencil:
 		if  config.cc_isgnu:
 			ccflags += ['-Wno-attributes']                    # __attribute__((pencil_access)) not removed by ppcg
 			ccflags += ['-Wno-implicit-function-declaration'] # __pencil_use/def/maybe left in summary functions
@@ -715,8 +717,6 @@ def common_cc_ld_args():
 		libpaths = extract_library_paths(ldflags)
 		for libpath in libpaths:
 			ldflags += ['-Xlinker', '-rpath', '-Xlinker', libpath] # -Wl is not recognized by nvcc
-
-	ldflags += config.opt_flags
 
 	return ldflags
 
@@ -1256,7 +1256,7 @@ def process(is_tool):
 			err_exit("Can just take one input file")
 
 		if known.keep:
-			compile(file_args, None, known.o)
+			compile(file_args, known.keep_dir, known.o)
 		elif known.pencil_tmpdir:
 			tmpdir = known.pencil_tmpdir
 			if os.path.isdir(tmpdir):
@@ -1267,9 +1267,6 @@ def process(is_tool):
 				compile(file_args, tmpdir, known.o)
 				if not known.keep_dir:
 					shutil.rmtree(tmpdir)
-		elif known.keep_dir is not None:
-			tmpdir = tempfile.mkdtemp(prefix='pencil.')
-			compile(file_args, tmpdir, known.o)
 		else:
 			compile(file_args, tmpdir, known.o)
 
