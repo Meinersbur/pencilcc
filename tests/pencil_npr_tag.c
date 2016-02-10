@@ -19,8 +19,9 @@ int main()
 
 	kernel(128, A, 1);
 
-	/* to verify that the host data is not used, we (illegaly) write to it
-	 * and afterwards chack that the legal data itself hasn't changed. */
+	/* To verify that the host data is not used, we (illegaly) write to it
+	 * and afterwards check that the legal data itself hasn't changed.
+	 * This is undefined behaviour, please don't use it in you programs. */
 	for (int i = 0; i < 128; ++i)
 		A[i] = 42;
 

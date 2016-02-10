@@ -424,13 +424,13 @@ def parsecmd(defaultcfg, is_tool):
 		help="Do not try to update yourself" if is_build() else argparse.SUPPRESS)
 
 	parser.add_argument('--run',    dest='run', action='store_true', help="Run executable after compilation")
-	parser.add_argument('--no-run', dest='run', action='store_false')
-	parser.add_argument('--run-arg','-Xrun',action='append')
-	parser.add_argument('--run-args',action='append')
+	parser.add_argument('--no-run', dest='run', action='store_false', help="Do not run executable after linking (default)")
+	parser.add_argument('--run-arg','-Xrun',action='append', help="Arguments passed to executable (passed literally)")
+	parser.add_argument('--run-args',action='append', help="Arguments passed to executable (will be unescaped)")
 	parser.set_defaults(ppcg=None,cpp=None,cc=None,nvcc=None,run=None)
 
 	# Passed to PPCG only
-	parser.add_argument('--target', metavar='TARGET', choices=['prl', 'opencl', 'cuda'], default='prl')
+	parser.add_argument('--target', choices=['prl', 'opencl', 'cuda'], default='prl', help="Generate code for (default: prl)")
 	if not is_tool:
 		parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[], help=argparse.SUPPRESS)
 		parser.add_argument('--no-isl-schedule-separate-components', action='store_true', help=argparse.SUPPRESS)
@@ -1131,12 +1131,30 @@ class CCArg:
 
 	def latest_objects(self):
 		objects = []
+
 		if self.cc_host_o is not None:
 			objects += [self.cc_host_o]
+		elif self.ppcg_host_c is not None:
+			objects += [self.ppcg_host_c]
+
 		if self.cc_kernel_o is not None:
 			objects += [self.cc_kernel_o]
+		elif self.ppcg_kernel_c is not None:
+			objects += [self.ppcg_kernel_c]
+
+
 		if self.nvcc_kernel_o is not None:
 			objects += [self.nvcc_kernel_o]
+		elif self.ppcg_kernel_cu is not None:
+			objects += [self.ppcg_kernel_cu]
+
+		if not objects:
+			if self.stage_i is not None:
+				objects += [self.stage_i]
+			elif self.cpp_i is not None:
+				objects += [self.cpp_i]
+			elif self.input_file is not None:
+				objects += [self.input_file]
 
 		return objects
 
@@ -1286,7 +1304,7 @@ def mktempwd(islast, outfile, tmpdir, prefix, targetfilename):
 		# with --keep and without --keep-dir
 		return targetfilename
 	else:
-		subdir = tempfile.mkdtemp(prefix='.' + prefix, dir=tmpdir)
+		subdir = tempfile.mkdtemp(prefix=prefix, dir=tmpdir)
 		basename = os.path.basename(targetfilename)
 		return os.path.join(subdir, basename)
 

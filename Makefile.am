@@ -33,7 +33,11 @@ TESTS = \
 	tests/check-pencil_npr_tag.sh \
 	tests/check-simple-cuda.sh \
 	tests/check-assume-prl.sh \
-	tests/check-assume-cuda.sh
+	tests/check-assume-cuda.sh \
+	tests/check-multifile-prl.sh \
+	tests/check-multifile-cuda.sh \
+	tests/check-multilink-prl.sh \
+	tests/check-multilink-cuda.sh
 
 EXTRA_DIST = \
 	autogen.sh \
@@ -59,7 +63,14 @@ EXTRA_DIST = \
 	tests/check-simple-cuda.sh \
 	tests/__pencil_assume.c \
 	tests/check-assume-prl.sh \
-	tests/check-assume-cuda.sh
+	tests/check-assume-cuda.sh \
+	tests/multilink_kernel1.pencil.c \
+	tests/multilink_kernel2.pencil.c \
+	tests/multilink_main.c \
+	tests/check-multifile-prl.sh \
+	tests/check-multifile-cuda.sh \
+	tests/check-multilink-prl.sh \
+	tests/check-multilink-cuda.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
