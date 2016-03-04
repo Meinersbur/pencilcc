@@ -14,7 +14,7 @@ ${PENCILCC} -c -vv -O3 --target=cuda -Werror "${TESTSRCDIR}/multilink_kernel1.pe
 ${PENCILCC} -c -vv -O3 --target=cuda -Werror "${TESTSRCDIR}/multilink_kernel2.pencil.c" -o multilink_kernel2.o
 
 echo "Linking..."
-${PENCILCC} -vv -O3 --target=cuda -Werror --autorpath multilink_main.o multilink_kernel1.o multilink_kernel2.o -o mulilink-cuda
+${PENCILCC} -vv -O3 --target=cuda -Werror --autorpath multilink_main.o multilink_kernel1.o multilink_kernel2.o -o multilink-cuda
 
 echo "Executing..."
 ./multilink-cuda

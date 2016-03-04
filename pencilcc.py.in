@@ -1009,15 +1009,18 @@ def filter_nvcc_args(ldargs):
 	# Cannot use argparse because order of -l and file parameters matter
 	while i < len(ldargs):
 		ldarg = ldargs[i]
-		if ldarg.startswith('-l') or ldarg.startswith('-L') or ldarg.startswith('-D') or ldarg.startswith('-I') or ldarg.startswith('-o') or ldarg.startswith('-O') or ldarg.startswith('-g'):
+		if ldarg.startswith('-l') or ldarg.startswith('-L') or ldarg.startswith('-D') or ldarg.startswith('-I') or ldarg.startswith('-o') or ldarg.startswith('-O'):
 			if len(ldarg)==2:
 				known += [ldarg, ldargs[i+1]]
 				i+=2
-				continue
 			else:
 				known += [ldarg]
 				i+=1
-				continue
+			continue
+		if ldarg.startswith('-g'):
+			known += [ldarg]
+			i+=1
+			continue
 		elif ldarg == '-Xlinker':
 			known += [ldarg, ldargs[i+1]]
 			i+=2
@@ -1032,6 +1035,27 @@ def filter_nvcc_args(ldargs):
 		i+=1
 
 	return known,unknown
+
+
+def ld_relocate_file(filearg,outfile):
+	global config
+	objects = filearg.latest_objects()
+
+	if config.target=='cuda' and False: # This doesn't work becaure nvcc ignored --cudart=none
+		cc = config.nvcc_prog
+		args = []
+		args += verbosity(config.nvcc_verbose)
+		args += objects
+		args += ['-Xlinker','--relocatable', '-Xcompiler','-nostartfiles', '-Xcompiler','-nodefaultlibs', '-Xcompiler','-nostdlib','--cudart=none', '-o', outfile]
+		invoke(cc, *args)
+	else:
+		cc = config.cc_prog
+		args = []
+		args += verbosity(config.cc_verbose)
+		args += objects
+		args += ['-Xlinker','--relocatable', '-nostartfiles','-nodefaultlibs','-nostdlib', '-o', outfile]
+		invoke(cc, *args)
+	filearg.ld_o = outfile
 
 
 def ld_file(args, outfile):
@@ -1100,6 +1124,7 @@ class CCArg:
 	cc_kernel_o = None
 	nvcc_kernel_o = None
 
+	ld_o = None
 	ld_exe = None
 
 
@@ -1130,6 +1155,9 @@ class CCArg:
 
 
 	def latest_objects(self):
+		if self.ld_o is not None:
+			return [self.ld_o]
+
 		objects = []
 
 		if self.cc_host_o is not None:
@@ -1141,7 +1169,6 @@ class CCArg:
 			objects += [self.cc_kernel_o]
 		elif self.ppcg_kernel_c is not None:
 			objects += [self.ppcg_kernel_c]
-
 
 		if self.nvcc_kernel_o is not None:
 			objects += [self.nvcc_kernel_o]
@@ -1260,6 +1287,11 @@ def process(is_tool):
 			show_config(config)
 			return
 
+		if config.autorpath and not config.cc_isgnu:
+			print("WARNING: --autorpath required GNU binutils",file=sys.stderr)
+		if config.ld_disabled and not config.cc_disabled and not config.cc_isgnu:
+			print("WARNING: --relocatable required GNU binutils",file=sys.stderr)
+
 		if n_files<=0:
 			err_exit("No input files")
 
@@ -1304,7 +1336,7 @@ def mktempwd(islast, outfile, tmpdir, prefix, targetfilename):
 		# with --keep and without --keep-dir
 		return targetfilename
 	else:
-		subdir = tempfile.mkdtemp(prefix=prefix, dir=tmpdir)
+		subdir = tempfile.mkdtemp(prefix=prefix + '_', dir=tmpdir)
 		basename = os.path.basename(targetfilename)
 		return os.path.join(subdir, basename)
 
@@ -1344,7 +1376,7 @@ def compile(args, tmpdir, output):
 
 		host_c = filearg.latest_host_source()
 		if host_c is not None:
-			hostofile = mktempwd(stop_after_cc, output, tmpdir, 'cc_host', changeext(filearg.input_file, '_host.o'))
+			hostofile = mktempwd(False, output, tmpdir, 'cc_host', changeext(filearg.input_file, '_host.o'))
 			filearg.cc_host_o = cc_file(infile=host_c,outfile=hostofile,args=file_args,isc=False,ispencil=False,moreargs=['-D__PENCIL_HOST__'])
 
 		if filearg.ppcg_kernel_c is not None:
@@ -1353,8 +1385,13 @@ def compile(args, tmpdir, output):
 
 		if filearg.ppcg_kernel_cu is not None:
 			kernelofile = mktempwd(False, output, tmpdir, 'nvcc_kernel', changeext(filearg.input_file, '_kernel.o'))
-			nvcc_cc_file(filearg=filearg, outfile= kernelofile,args=[])
+			nvcc_cc_file(filearg=filearg,outfile=kernelofile,args=[])
 			has_cuda = True
+
+		objects = filearg.latest_objects()
+		if stop_after_cc and len(objects) > 1:
+			mergeofile = mktempwd(stop_after_cc, output, tmpdir, 'ld-relocate', changeext(filearg.input_file, '.o'))
+			ld_relocate_file(filearg=filearg,outfile=mergeofile)
 
 	if stop_after_cc:
 		return # TODO: Check there is just one input file

@@ -17,13 +17,13 @@ static double get_time() {
 
 int main() {
 	printf("Kernel start\n");
-	float A[128];
+	float A[1024];
 	double start_time = get_time();
-	kernel1(128, A);
-	kernel2(128, A);
+	kernel1(1024, A);
+	kernel2(1024, A);
 	double stop_time = get_time();
-	for (int i = 0; i < 128; i += 1) {
-		if (A[i] != 42) {
+	for (int i = 0; i < 1024; i += 1) {
+		if (A[i] != i*i) {
 			printf("Wrong result");
 			exit(1);
 		}
