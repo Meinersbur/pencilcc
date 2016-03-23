@@ -25,6 +25,7 @@ TESTS = \
 	tests/polybench_test.sh \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
+	tests/check-simple-keep-cuda.sh \
 	tests/check-prl_alloc.sh \
 	tests/check-prl_mem_alloc.sh \
 	tests/check-prl_manage.sh \
@@ -48,6 +49,7 @@ EXTRA_DIST = \
 	tests/simple.c \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
+	tests/check-simple-keep-cuda.sh \
 	tests/prl_alloc.c \
 	tests/check-prl_alloc.sh \
 	tests/prl_mem_alloc.c \
