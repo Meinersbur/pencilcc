@@ -10,6 +10,8 @@ import tempfile
 import sys # sys.stderr
 import copy
 import shutil # shutil.rmtree
+import collections # collections.Iterable
+
 
 script = os.path.abspath(sys.argv[0])
 
@@ -129,8 +131,8 @@ class Configuration:
 
 		self.opencl_embed_kernel_code = None
 		self.std='c99'
-		self.pencil_ext=['.pencil.c','.pencil']
-		self.c_ext=['.c','.i','.ii']
+		self.pencil_ext = ['.pencil.c','.pencil']
+		self.c_ext = ['.c','.i','.ii']
 		self.autorpath = False
 
 
@@ -340,6 +342,21 @@ def print_versions():
 		print()
 
 
+# From https://bugs.python.org/issue16399
+class AppendAction(argparse.Action):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not isinstance(self.default, collections.Iterable):
+            self.default = [self.default]
+        self.reset_dest = False
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if not self.reset_dest:
+            setattr(namespace, self.dest, [])
+            self.reset_dest = True
+        getattr(namespace, self.dest).append(values)
+
+
 def add_captured_cc_args(defaultcfg, parser):
 	# Passed to PPCG and CC
 	parser.add_argument('-D', action='append', default=[], help=argparse.SUPPRESS)
@@ -405,7 +422,7 @@ def parsecmd(defaultcfg, is_tool):
 	# Is disabled by --no-cc as well
 	parser.add_argument('--nvcc-prog',help="Path to nvcc compiler executable (default: " + defaultcfg.nvcc_prog + ")")
 	parser.add_argument('--nvcc-arg', '-Xnvcc', action='append',help="Additional nvcc argument (passed literally)")
-	parser.add_argument('--nvcc-args',action='append',help="Additional nvcc arguments (will be unescaped)")
+	parser.add_argument('--nvcc-args', action='append',help="Additional nvcc arguments (will be unescaped)")
 
 	#parser.add_argument('--ld',dest='ld',action='store_true')
 	#parser.add_argument('--no-ld', dest='ld', action='store_false')
@@ -414,9 +431,9 @@ def parsecmd(defaultcfg, is_tool):
 	#parser.add_argument('--ld-flags', action='append')
 
 	parser.add_argument('--autorpath', action='store_true', help="Set linker rpath to runtime libraries.")
-	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action='append', default=defaultcfg.pencil_ext,
+	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action=AppendAction, default=defaultcfg.pencil_ext,
 		help="File extentions for forcing --pet-autodetect (default: .pencil.c,.pencil)")
-	parser.add_argument('--c-ext', metavar='SUFFIXES', action='append', default=defaultcfg.c_ext,
+	parser.add_argument('--c-ext', metavar='SUFFIXES', action=AppendAction, default=defaultcfg.c_ext,
 		help="File extensions that are to be processed by ppcg (implicitely includes all --pencil-ext)")
 
 	# Action control
@@ -425,8 +442,8 @@ def parsecmd(defaultcfg, is_tool):
 
 	parser.add_argument('--run',    dest='run', action='store_true', help="Run executable after compilation")
 	parser.add_argument('--no-run', dest='run', action='store_false', help="Do not run executable after linking (default)")
-	parser.add_argument('--run-arg','-Xrun',action='append', help="Arguments passed to executable (passed literally)")
-	parser.add_argument('--run-args',action='append', help="Arguments passed to executable (will be unescaped)")
+	parser.add_argument('--run-arg','-Xrun', action='append', help="Arguments passed to executable (passed literally)")
+	parser.add_argument('--run-args', action='append', help="Arguments passed to executable (will be unescaped)")
 	parser.set_defaults(ppcg=None,cpp=None,cc=None,nvcc=None,run=None)
 
 	# Passed to PPCG only
@@ -721,13 +738,13 @@ def common_cc_ld_args():
 	return ldflags
 
 
-def assemble_cpp_args(infile, outfile, isc, ispencil,args):
+def assemble_cpp_args(infile, outfile, isc, ispencil, args):
 	global config
 
 	cppargs = ['-E']
 	cppargs += verbosity(config.cpp_verbose)
 	if infile is not None:
-		cppargs += [infile]
+		cppargs += ['-x','c', infile]
 	if config.cc_isgnu and (config.std is not None):
 		cppargs += ['-std=' + config.std]
 
