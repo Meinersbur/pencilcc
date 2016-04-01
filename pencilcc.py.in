@@ -744,7 +744,7 @@ def assemble_cpp_args(infile, outfile, isc, ispencil, args):
 	cppargs = ['-E']
 	cppargs += verbosity(config.cpp_verbose)
 	if infile is not None:
-		cppargs += ['-x','c', infile]
+		cppargs += ['-x', 'c', infile]
 	if config.cc_isgnu and (config.std is not None):
 		cppargs += ['-std=' + config.std]
 
@@ -768,7 +768,7 @@ def exec_cpp(infile, outfile, isc, ispencil, args):
 	invoke(config.cc_prog, *cppargs)
 
 
-def assemble_ppcg_args(infile, outfile, isc, ispencil,  force_embed):
+def assemble_ppcg_args(infile, outfile, isc, ispencil, force_embed):
 	global config
 
 	ppcgargs = []
@@ -776,7 +776,7 @@ def assemble_ppcg_args(infile, outfile, isc, ispencil,  force_embed):
 	if infile is not None:
 		ppcgargs += [infile]
 
-	ppcgargs += common_cpp_args(pencil_level=2,isc=isc,ispencil=ispencil)
+	ppcgargs += common_cpp_args(pencil_level=2, isc=isc, ispencil=ispencil)
 	ppcgargs += ['-D__PENCIL_PPCG__']
 
 	ppcgargs += ['--target=' + config.target]
@@ -791,6 +791,7 @@ def assemble_ppcg_args(infile, outfile, isc, ispencil,  force_embed):
 	if outfile is not None:
 		ppcgargs += ['-o', outfile]
 	return ppcgargs
+
 
 def exec_ppcg(infile, outfile, isc, ispencil, force_embed):
 	global config
@@ -1325,19 +1326,19 @@ def process(is_tool):
 			err_exit("Can just take one input file")
 
 		if known.keep:
-			compile(file_args, known.keep_dir, known.o)
+			compile(file_args, known.keep_dir, known.o, False)
 		elif known.pencil_tmpdir:
 			tmpdir = known.pencil_tmpdir
 			if os.path.isdir(tmpdir):
 				# Do not delete directories we did not create
-				compile(file_args, tmpdir, known.o)
+				compile(file_args, tmpdir, known.o, True)
 			else:
 				os.makedirs(tmpdir)
-				compile(file_args, tmpdir, known.o)
+				compile(file_args, tmpdir, known.o, True)
 				if not known.keep_dir:
 					shutil.rmtree(tmpdir)
 		else:
-			compile(file_args, tmpdir, known.o)
+			compile(file_args, tmpdir, known.o, True)
 
 
 def has_ext(filename, suffixes):
@@ -1347,20 +1348,25 @@ def has_ext(filename, suffixes):
 	return False
 
 
-def mktempwd(islast, outfile, tmpdir, prefix, targetfilename):
+def mktempwd(islast, outfile, tmpdir, prefix, targetfilename, use_subdir):
 	if islast:
 		return outfile
 
 	if tmpdir is None:
 		# with --keep and without --keep-dir
 		return targetfilename
-	else:
+	elif use_subdir:
+		# without --keep
 		subdir = tempfile.mkdtemp(prefix=prefix + '_', dir=tmpdir)
 		basename = os.path.basename(targetfilename)
 		return os.path.join(subdir, basename)
+	else:
+		# with --keep and --keep-dir (which is tmpdir)
+		basename = os.path.basename(targetfilename)
+		return os.path.join(tmpdir, basename)
 
 
-def compile(args, tmpdir, output):
+def compile(args, tmpdir, output, use_subdirs):
 	global config
 
 	file_args = [arg for arg in args if not arg.is_arg()]
@@ -1384,37 +1390,37 @@ def compile(args, tmpdir, output):
 		if not filearg.isc and not filearg.ispencil:
 			continue
 
-		ifile = mktempwd(stop_after_cpp, output, tmpdir, 'cpp', changeext(filearg.input_file, '.i'))
+		ifile = mktempwd(stop_after_cpp, output, tmpdir, 'cpp', changeext(filearg.input_file, '.i'), use_subdirs)
 		cpp_file(filearg=filearg, outfile=ifile, args=file_args)
 		if stop_after_cpp:
 			continue
 
 		# Essentially because ppcg has no -inlude cmdline option, but also will forward it cc/nvcc
-		stagefile = mktempwd(False, output, tmpdir, 'stage', changeext(filearg.input_file, '_stage.i'))
+		stagefile = mktempwd(False, output, tmpdir, 'stage', changeext(filearg.input_file, '_stage.i'), use_subdirs)
 		filearg.stage_i = prepend_header(infile=filearg.latest_host_source(), outfile=stagefile, header=config.pencil_ppcg_h)
 
-		hostfile = mktempwd(stop_after_ppcg, output, tmpdir, 'ppcg', changeext(filearg.input_file, '_ppcg.c'))
+		hostfile = mktempwd(stop_after_ppcg, output, tmpdir, 'ppcg', changeext(filearg.input_file, '_ppcg.c'), use_subdirs)
 		ppcg_file(filearg=filearg, outfile=hostfile, force_embed=tmpdir is not None)
 		if stop_after_ppcg:
 			continue
 
 		host_c = filearg.latest_host_source()
 		if host_c is not None:
-			hostofile = mktempwd(False, output, tmpdir, 'cc_host', changeext(filearg.input_file, '_host.o'))
+			hostofile = mktempwd(False, output, tmpdir, 'cc_host', changeext(filearg.input_file, '_host.o'), use_subdirs)
 			filearg.cc_host_o = cc_file(infile=host_c, outfile=hostofile, args=file_args, isc=False, ispencil=False, moreargs=['-D__PENCIL_HOST__'] + moreinclude)
 
 		if filearg.ppcg_kernel_c is not None:
-			kernelofile = mktempwd(False, output, tmpdir, 'cc_kernel', changeext(filearg.input_file, '_kernel.o'))
+			kernelofile = mktempwd(False, output, tmpdir, 'cc_kernel', changeext(filearg.input_file, '_kernel.o'), use_subdirs)
 			filearg.cc_kernel_o = cc_file(infile=filearg.ppcg_kernel_c, outfile=kernelofile,args=[], isc=filearg.isc, ispencil=filearg.ispencil, moreargs=['-D__PENCIL_KERNEL__'])
 
 		if filearg.ppcg_kernel_cu is not None:
-			kernelofile = mktempwd(False, output, tmpdir, 'nvcc_kernel', changeext(filearg.input_file, '_kernel.o'))
+			kernelofile = mktempwd(False, output, tmpdir, 'nvcc_kernel', changeext(filearg.input_file, '_kernel.o'), use_subdirs)
 			nvcc_cc_file(filearg=filearg,outfile=kernelofile,args=[])
 			has_cuda = True
 
 		objects = filearg.latest_objects()
 		if stop_after_cc and len(objects) > 1:
-			mergeofile = mktempwd(stop_after_cc, output, tmpdir, 'ld-relocate', changeext(filearg.input_file, '.o'))
+			mergeofile = mktempwd(stop_after_cc, output, tmpdir, 'ld-relocate', changeext(filearg.input_file, '.o'), use_subdirs)
 			ld_relocate_file(filearg=filearg,outfile=mergeofile)
 
 	if stop_after_cc:
