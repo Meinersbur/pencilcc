@@ -26,6 +26,8 @@ TESTS = \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
 	tests/check-simple-keep-cuda.sh \
+	tests/check-structbyval-prl.sh \
+	tests/check-structbyval-cuda.sh \
 	tests/check-prl_alloc.sh \
 	tests/check-prl_mem_alloc.sh \
 	tests/check-prl_manage.sh \
@@ -50,6 +52,9 @@ EXTRA_DIST = \
 	tests/check-simple.sh \
 	tests/check-simple-keep.sh \
 	tests/check-simple-keep-cuda.sh \
+	tests/structbyval.c \
+	tests/check-structbyval-prl.sh \
+	tests/check-structbyval-cuda.sh \
 	tests/prl_alloc.c \
 	tests/check-prl_alloc.sh \
 	tests/prl_mem_alloc.c \
