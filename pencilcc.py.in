@@ -58,12 +58,11 @@ class Configuration:
 		  'ld_disabled',   'ld_prog',   'ld_flags',   'ld_verbose',
 		  'run_enabled',   'run_flags',
 		  'opt_flags',
-		  'pencil_h_cppflags',
-		  'pencil_opencl_ppcgflags',
+		  'pencil_include_dir', 'pencil_h_cppflags',
 		  'ocl_utilities_cppflags', 'ocl_utilities_cflags', 
-		  'prl_disabled', 'prl_cppflags', 'prl_lflags',
+		  'prl_disabled', 'prl_include_dir', 'prl_cppflags', 'prl_lflags',
 		  'common_cppflags','common_cflags','common_lflags',
-		  'pencil_h', 'pencil_ppcg_h',
+		  'pencil_h',
 		  'opencl_embed_kernel_code','std','pencil_ext','c_ext', 'autorpath']
 
 	def __init__(self):
@@ -113,7 +112,8 @@ class Configuration:
 		self.opt_flags = []
 
 		self.pencil_h_cppflags = []
-		self.pencil_opencl_ppcgflags = ['--opencl-include-file=pencil_opencl.h']
+		self.pencil_h = 'pencil.h'
+		self.pencil_include_dir = ''
 
 		self.ocl_utilities_cflags = []
 		self.ocl_utilities_cppflags = []
@@ -121,13 +121,11 @@ class Configuration:
 		self.prl_disabled = False #TODO: Search for existance of libprl_opencl in system library path
 		self.prl_cppflags = []
 		self.prl_lflags = ['-lprl_opencl']
+		self.prl_include_dir = ''
 		
 		self.common_cppflags = []
 		self.common_cflags = []
 		self.common_lflags = []
-
-		self.pencil_h = 'pencil.h'
-		self.pencil_ppcg_h = 'pencil_ppcg.h'
 
 		self.opencl_embed_kernel_code = None
 		self.std='c99'
@@ -153,26 +151,27 @@ class Configuration:
 
 		if with_pencil_util=='no':
 			self.pencil_h_cppflags = []
-			self.pencil_opencl_ppcgflags = []
+			self.pencil_include_dir = ''
 		elif with_pencil_util=='bundled' or with_pencil_util=='build':
 			self.pencil_h_cppflags = ['-I', os.path.join(PENCIL_UTIL_SRCDIR, 'include')]
-			self.pencil_opencl_ppcgflags = ['--opencl-include-file=' + os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil_opencl.h')]
+			self.pencil_include_dir = os.path.join(PENCIL_UTIL_SRCDIR, 'include')
 
 		if with_prl=='no':
 			self.prl_disabled = True
 			self.prl_cppflags = []
 			self.prl_lflags = []
+			self.prl_include_dir = ''
 		elif with_prl=='bundled' or with_prl=='build':
 			self.prl_disabled = False
 			self.prl_cppflags = ['-I', os.path.join(PRL_SRCDIR, 'include')]
 			self.prl_lflags = ['-L', os.path.join(PRL_BUILDDIR, 'src', '.libs'), '-lprl_opencl']
+			self.prl_include_dir = os.path.join(PRL_SRCDIR, 'include')
 
 		self.common_cppflags = []
 		self.common_cflags = []
 		self.common_lflags = []
 
 		self.pencil_h = os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil.h')
-		self.pencil_ppcg_h = os.path.join(PENCIL_UTIL_SRCDIR, 'include', 'pencil_ppcg.h')
 
 
 	def install_config(self):
@@ -184,7 +183,6 @@ class Configuration:
 		self.ppcg_verbose = 0
 
 		self.pencil_h_cppflags = []
-		self.pencil_opencl_ppcgflags = ['--opencl-include-file=' + os.path.join(includedir,'pencil_opencl.h')]
 
 		self.ocl_utilities_cppflags = []
 		self.ocl_utilities_cflags =  [os.path.join(datadir,'ppcg','ocl_utilities.c')]
@@ -198,7 +196,6 @@ class Configuration:
 		self.common_lflags = ['-L', libdir]
 
 		self.pencil_h = os.path.join(includedir,'pencil.h')
-		self.pencil_ppcg_h = os.path.join(includedir,'pencil_ppcg.h')
 
 
 def show_config(config):
@@ -784,8 +781,17 @@ def assemble_ppcg_args(infile, outfile, isc, ispencil, force_embed):
 		ppcgargs += ['--pet-autodetect']
 	if (config.target != 'cuda') and (config.opencl_embed_kernel_code or force_embed):
 		ppcgargs += ['--opencl-embed-kernel-code']
-	if config.target != 'cuda':
-		ppcgargs += config.pencil_opencl_ppcgflags
+
+	if isc or ispencil:
+		ppcgargs += ['--pet-include=' + os.path.join(config.pencil_include_dir, 'pencil_ppcg.h')]
+		ppcgargs += ['--host-include-file=' + os.path.join(config.pencil_include_dir,'pencil_host_c.h')]
+		if config.target != 'cuda':
+			ppcgargs += ['--kernel-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_kernel_c.h')]
+			ppcgargs += ['--opencl-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_kernel_cl.h')]
+			if config.target == 'prl':
+				ppcgargs += ['--kernel-include-file=' + os.path.join(config.prl_include_dir, 'prl_scop.h')]
+		else:
+			ppcgargs += ['--kernel-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_kernel_cu.h')]
 	ppcgargs += config.ppcg_flags
 
 	if outfile is not None:
@@ -922,17 +928,6 @@ def exec_nvcc_ld(args,outfile):
 	global config
 	nvccargs = assemble_nvcc_ld_args(args=args,outfile=outfile)
 	invoke(config.nvcc_prog, *nvccargs)
-
-
-def prepend_header(infile, outfile, header):
-	global config
-	if outfile is None:
-		outfile = changeext(infile, '_stage.c')
-	with open(outfile, 'w') as out:
-		out.write('#include <' + header + '>\n')
-		with open(infile, 'r') as instream:
-			shutil.copyfileobj(instream, out)
-	return outfile
 
 
 def cpp_file(filearg, outfile,args):
@@ -1131,7 +1126,6 @@ class CCArg:
 	ispencil = False
 
 	cpp_i = None
-	stage_i = None
 
 	ppcg_host_c = None
 	ppcg_kernel_h = None
@@ -1166,8 +1160,6 @@ class CCArg:
 	def latest_host_source(self):
 		if self.ppcg_host_c is not None:
 			return self.ppcg_host_c
-		if self.stage_i is not None:
-			return self.stage_i
 		if self.cpp_i is not None:
 			return self.cpp_i
 		if (self.isc or self.ispencil) and self.input_file is not None:
@@ -1196,9 +1188,7 @@ class CCArg:
 			objects += [self.ppcg_kernel_cu]
 
 		if not objects:
-			if self.stage_i is not None:
-				objects += [self.stage_i]
-			elif self.cpp_i is not None:
+			if self.cpp_i is not None:
 				objects += [self.cpp_i]
 			elif self.input_file is not None:
 				objects += [self.input_file]
@@ -1394,10 +1384,6 @@ def compile(args, tmpdir, output, use_subdirs):
 		cpp_file(filearg=filearg, outfile=ifile, args=file_args)
 		if stop_after_cpp:
 			continue
-
-		# Essentially because ppcg has no -inlude cmdline option, but also will forward it cc/nvcc
-		stagefile = mktempwd(False, output, tmpdir, 'stage', changeext(filearg.input_file, '_stage.i'), use_subdirs)
-		filearg.stage_i = prepend_header(infile=filearg.latest_host_source(), outfile=stagefile, header=config.pencil_ppcg_h)
 
 		hostfile = mktempwd(stop_after_ppcg, output, tmpdir, 'ppcg', changeext(filearg.input_file, '_ppcg.c'), use_subdirs)
 		ppcg_file(filearg=filearg, outfile=hostfile, force_embed=tmpdir is not None)
