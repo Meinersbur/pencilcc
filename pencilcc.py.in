@@ -128,7 +128,7 @@ class Configuration:
 		self.common_lflags = []
 
 		self.opencl_embed_kernel_code = None
-		self.std='c99'
+		self.std = None
 		self.pencil_ext = ['.pencil.c','.pencil']
 		self.c_ext = ['.c','.i','.ii']
 		self.autorpath = False
@@ -367,8 +367,7 @@ def add_captured_cc_args(defaultcfg, parser):
 	parser.add_argument('-o', metavar='OUTPUT', help=argparse.SUPPRESS)
 	parser.add_argument('-x', nargs=2, help=argparse.SUPPRESS) # TODO: Implement support
 	parser.add_argument('-c', action='store_true', default=False, help=argparse.SUPPRESS)
-	parser.add_argument('-std', metavar='STD', choices=['gnu99', 'c99'],
-		help="C standard mode (default: " + defaultcfg.std + ")")
+	parser.add_argument('-std', metavar='STD', help="Language dialect (c99, gnu99)")
 
 
 def parsecmd(defaultcfg, is_tool):
@@ -681,13 +680,14 @@ def common_cpp_args(pencil_level,isc,ispencil):
 	cppflags += config.common_cppflags
 	cppflags += config.pencil_h_cppflags
 
-	if isc or ispencil:
-		if config.target=='cuda':
-			pass
-		elif config.prl_disabled:
+	if config.target=='cuda':
+		pass
+	elif config.prl_disabled:
+		if isc or ispencil:
 			cppflags += config.ocl_utilities_cppflags
-		else:
-			cppflags += config.prl_cppflags
+	else:
+		# Allow host part (eg. written in C++) to call PRL functions as well
+		cppflags += config.prl_cppflags
 
 	return cppflags
 
@@ -740,6 +740,27 @@ def common_cc_ld_args():
 	return ldflags
 
 
+
+def get_std_arg(isc, ispencil):
+	global config
+
+	if not config.cc_isgnu:
+		return []
+
+	if isc or ispencil:
+		# Use the user-specified C-dialect, gnu99 is default
+		std = 'gnu99'
+		if config.std in {'c89', 'c90', 'c99', 'c9x', 'iso9899:1990', 'iso9899:199409', 'c11', 'c1x', 'iso9899:2011', 'gnu98', 'gnu90', 'gnu9x', 'gnu99', 'gnu11', 'gnu1x'}:
+			std = config.std
+		return ['-std=' + std]
+	else:
+		# Use the user-specified one, even if C++
+		if config.std is None:
+			return []
+		else:
+			return ['-std=' + config.std]
+
+
 def assemble_cpp_args(infile, outfile, isc, ispencil, args):
 	global config
 
@@ -747,8 +768,7 @@ def assemble_cpp_args(infile, outfile, isc, ispencil, args):
 	cppargs += verbosity(config.cpp_verbose)
 	if infile is not None:
 		cppargs += ['-x', 'c', infile]
-	if config.cc_isgnu and (config.std is not None):
-		cppargs += ['-std=' + config.std]
+	cppargs += get_std_arg(isc, ispencil)
 
 	cppargs += common_cpp_args(pencil_level=1,isc=isc,ispencil=ispencil)
 	cppargs += ['-D__PENCIL_CPP__']
@@ -819,8 +839,7 @@ def assemble_cc_args(infile, outfile, args, isc, ispencil, moreargs):
 	if infile is not None:
 		ccargs += [infile]
 
-	if config.cc_isgnu and (config.std is not None):
-		ccargs += ['-std=' + config.std]
+	ccargs += get_std_arg(isc, ispencil)
 	ccargs += common_cc_args(args=args, isc=isc, ispencil=ispencil)
 	if moreargs is not None:
 		ccargs += moreargs
@@ -871,6 +890,7 @@ def assemble_cc_ld_args(args, outfile):
 	ldargs = []
 	ldargs += verbosity(config.ld_verbose)
 
+	ldargs += get_std_arg(isc=False, ispencil=False)
 	ldargs += common_cc_args(args=[],isc=False,ispencil=False)
 
 	if args is not None:
@@ -900,8 +920,9 @@ def assemble_nvcc_ld_args(args, outfile):
 	nvccargs = []
 	nvccargs += verbosity(config.nvcc_verbose)
 
-	if config.std is not None:
-		nvccargs += ['-Xcompiler', '-std='+config.std]
+	std = get_std_arg(isc=False, ispencil=False)
+	if std:
+		nvccargs += ['-Xcompiler'] + std
 
 	ccargs = common_cc_args(args=[],isc=False,ispencil=False)
 	compatible,incompatible = filter_nvcc_args(ccargs)
