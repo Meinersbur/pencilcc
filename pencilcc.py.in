@@ -831,13 +831,16 @@ def exec_ppcg(infile, outfile, isc, ispencil, force_embed):
 
 
 # To compile _host.c and .pencil.c (with --no-ppcg)
-def assemble_cc_args(infile, outfile, args, isc, ispencil, moreargs):
+def assemble_cc_args(infile, outfile, args, isc, ispencil, moreargs, ishostc=False, iskernelc=False):
 	global config
 
 	ccargs = ['-c']
 	ccargs += verbosity(config.cc_verbose)
 	if infile is not None:
-		ccargs += [infile]
+		if ishostc or iskernelc:
+			ccargs += ['-x', 'c', infile]
+		else:
+			ccargs += [infile]
 
 	ccargs += get_std_arg(isc, ispencil)
 	ccargs += common_cc_args(args=args, isc=isc, ispencil=ispencil)
@@ -849,9 +852,9 @@ def assemble_cc_args(infile, outfile, args, isc, ispencil, moreargs):
 	return ccargs
 
 
-def exec_cc(infile, outfile,args, isc, ispencil,moreargs):
+def exec_cc(infile, outfile,args, isc, ispencil, moreargs, ishostc=False, iskernelc=False):
 	global config
-	ccargs = assemble_cc_args(infile=infile, outfile=outfile, args=args, isc=isc, ispencil=ispencil, moreargs=moreargs)
+	ccargs = assemble_cc_args(infile=infile, outfile=outfile, args=args, isc=isc, ispencil=ispencil, moreargs=moreargs, ishostc=ishostc, iskernelc=iskernelc)
 	invoke(config.cc_prog, *ccargs)
 
 
@@ -991,12 +994,12 @@ def ppcg_file(filearg, outfile, force_embed):
 		filearg.ppcg_kernel_cl = os.path.abspath(rootname + '_kernel.cl')
 
 
-def cc_file(infile, outfile,args, isc, ispencil, moreargs):
+def cc_file(infile, outfile,args, isc, ispencil, moreargs, ishostc=False, iskernelc=False):
 	global config
 	if config.cc_disabled:
 		return None
 
-	exec_cc(infile=infile,outfile=outfile,args=args,isc=isc,ispencil=ispencil,moreargs=moreargs)
+	exec_cc(infile=infile,outfile=outfile,args=args,isc=isc,ispencil=ispencil,moreargs=moreargs,ishostc=ishostc,iskernelc=iskernelc)
 
 	if outfile is None:
 		outfile = changeext(infile, '.o')
@@ -1399,8 +1402,7 @@ def compile(args, tmpdir, output, use_subdirs):
 		moreinclude = ['-I', tmpdir]
 
 	for filearg in file_args:
-		if filearg.is_arg():
-			continue
+		assert not filearg.is_arg()
 		if not filearg.isc and not filearg.ispencil:
 			continue
 
@@ -1417,11 +1419,11 @@ def compile(args, tmpdir, output, use_subdirs):
 		host_c = filearg.latest_host_source()
 		if host_c is not None:
 			hostofile = mktempwd(False, output, tmpdir, 'cc_host', changeext(filearg.input_file, '_host.o'), use_subdirs)
-			filearg.cc_host_o = cc_file(infile=host_c, outfile=hostofile, args=file_args, isc=False, ispencil=False, moreargs=['-D__PENCIL_HOST__'] + moreinclude)
+			filearg.cc_host_o = cc_file(infile=host_c, outfile=hostofile, args=file_args, isc=False, ispencil=False, moreargs=['-D__PENCIL_HOST__'] + moreinclude, ishostc=True)
 
 		if filearg.ppcg_kernel_c is not None:
 			kernelofile = mktempwd(False, output, tmpdir, 'cc_kernel', changeext(filearg.input_file, '_kernel.o'), use_subdirs)
-			filearg.cc_kernel_o = cc_file(infile=filearg.ppcg_kernel_c, outfile=kernelofile,args=[], isc=filearg.isc, ispencil=filearg.ispencil, moreargs=['-D__PENCIL_KERNEL__'])
+			filearg.cc_kernel_o = cc_file(infile=filearg.ppcg_kernel_c, outfile=kernelofile,args=[], isc=filearg.isc, ispencil=filearg.ispencil, moreargs=['-D__PENCIL_KERNEL__'], iskernelc=True)
 
 		if filearg.ppcg_kernel_cu is not None:
 			kernelofile = mktempwd(False, output, tmpdir, 'nvcc_kernel', changeext(filearg.input_file, '_kernel.o'), use_subdirs)
@@ -1438,7 +1440,7 @@ def compile(args, tmpdir, output, use_subdirs):
 
 	if output is None and config.run_enabled:
 		output = 'a.out'
-	exefile = ld_file(args=file_args, outfile=output)
+	exefile = ld_file(args=args, outfile=output)
 
 	if not config.run_enabled:
 		return
