@@ -689,6 +689,8 @@ def common_cpp_args(pencil_level,isc,ispencil):
 		# Allow host part (eg. written in C++) to call PRL functions as well
 		cppflags += config.prl_cppflags
 
+	cppflags += config.cpp_flags
+
 	return cppflags
 
 
@@ -731,11 +733,6 @@ def common_cc_ld_args():
 		libpaths = extract_library_paths(ldflags)
 		for libpath in libpaths:
 			ldflags += ['-Xlinker', '-rpath', '-Xlinker', libpath] # -Wl is not recognized by nvcc
-
-	# Also pass manually added flags for compiling non-PENCIL files
-	ldflags += config.cpp_flags
-	ldflags += config.cc_flags
-	ldflags += config.opt_flags
 
 	return ldflags
 
