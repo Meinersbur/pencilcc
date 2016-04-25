@@ -732,6 +732,11 @@ def common_cc_ld_args():
 		for libpath in libpaths:
 			ldflags += ['-Xlinker', '-rpath', '-Xlinker', libpath] # -Wl is not recognized by nvcc
 
+	# Also pass manually added flags for compiling non-PENCIL files
+	ldflags += config.cpp_flags
+	ldflags += config.cc_flags
+	ldflags += config.opt_flags
+
 	return ldflags
 
 
