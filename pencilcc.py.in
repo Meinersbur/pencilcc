@@ -866,8 +866,6 @@ def assemble_cc_ld_args(args, outfile):
 	ldargs = []
 	ldargs += verbosity(config.ld_verbose)
 
-	if config.cc_isgnu and (config.std is not None):
-			ldargs += ['-std=' + config.std]
 	ldargs += common_cc_args(args=[],isc=False,ispencil=False)
 
 	if args is not None:
