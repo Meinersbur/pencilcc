@@ -55,7 +55,9 @@ class Configuration:
 		  'ppcg_disabled', 'ppcg_prog', 'ppcg_flags', 'ppcg_verbose',
 		  'cc_disabled',   'cc_prog',   'cc_flags',   'cc_verbose',   'cc_isgnu',
 		  'nvcc_disabled', 'nvcc_prog', 'nvcc_flags', 'nvcc_verbose',
-		  'ld_disabled',   'ld_prog',   'ld_flags',   'ld_verbose',
+		  'ld_disabled',
+		                   'ccld_prog', 'ccld_flags',   'ccld_verbose',
+		                   'nvccld_prog','nvccld_flags','nvccld_verbose',
 		  'run_enabled',   'run_flags',
 		  'opt_flags',
 		  'pencil_include_dir', 'pencil_h_cppflags',
@@ -102,9 +104,14 @@ class Configuration:
 		self.nvcc_verbose = 0
 
 		self.ld_disabled = False
-		self.ld_prog = 'cc' # Used?
-		self.ld_flags = []  # Used?
-		self.ld_verbose = 0 # Used?
+
+		self.ccld_prog = 'cc'
+		self.ccld_flags = []
+		self.ccld_verbose = 0
+
+		self.nvccld_prog = 'nvcc'
+		self.nvccld_flags = []
+		self.nvccld_verbose = 0
 
 		self.run_enabled = False
 		self.run_flags = []
@@ -130,7 +137,7 @@ class Configuration:
 		self.opencl_embed_kernel_code = None
 		self.std = None
 		self.pencil_ext = ['.pencil.c','.pencil']
-		self.c_ext = ['.c','.i','.ii']
+		self.c_ext = ['.c', '.i']
 		self.autorpath = False
 
 
@@ -396,7 +403,7 @@ def parsecmd(defaultcfg, is_tool):
 
 	parser.add_argument('--cpp',dest='cpp',action='store_true')
 	parser.add_argument('--no-cpp',dest='cpp',action='store_false')
-	#parser.add_argument('--cpp-prog',metavar='CPP',default=None,help="Path to preprocessor executable (default: " + defaultcfg.cpp_prog + ")")
+	parser.add_argument('--cpp-prog',metavar='CPP',default=None,help="Path to preprocessor executable (default: " + defaultcfg.cpp_prog + ")")
 	parser.add_argument('--cpp-arg', '-Xpreprocessor',action='append',help="Additional argument for preprocessor (passed literally)")
 	parser.add_argument('--cpp-args',action='append',help="Additional arguments for preprocessor (will be unescaped")
 
@@ -407,24 +414,32 @@ def parsecmd(defaultcfg, is_tool):
 	parser.add_argument('--ppcg-args',action='append',help="Additional arguments for ppcg (will be unescaped")
 
 	if not is_tool:
-		# Used for compiling .c (ppcg output), linking (--target=prl or opencl), non-pencil omput files (eg. .c, .cpp, non-existing) are intentionally passed to the linker
-		parser.add_argument('--cc',dest='cc',action='store_true')
-		parser.add_argument('--no-cc',dest='cc',action='store_false')
-		parser.add_argument('--cc-prog',help="Path to C compiler executable (default: " + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
-		parser.add_argument('--cc-arg', action='append',help="Additional compiler argument (passed literally)") # How to pass -Xcompiler when linking?
-		parser.add_argument('--cc-args',action='append',help="Additional compiler arguments (will be unescaped)")
+		parser.add_argument('--tool-prog',help="Path to C compiler executable (default: " + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
+		parser.add_argument('--tool-arg', action='append',help="Additional compiler argument (passed literally)") # How to pass -Xcompiler when linking?
+		parser.add_argument('--tool-args',action='append',help="Additional compiler arguments (will be unescaped)")
+
+	parser.add_argument('--cc',dest='cc',action='store_true')
+	parser.add_argument('--no-cc',dest='cc',action='store_false')
+	parser.add_argument('--cc-prog', metavar='CC', help="Path to C compiler executable (default: " + (defaultcfg.cc_prog if defaultcfg.cc_prog is not None else defaultcfg.c99_prog) + ")")
+	parser.add_argument('--cc-arg', action='append',help="Additional compiler argument (passed literally)") # How to pass -Xcompiler when linking?
+	parser.add_argument('--cc-args',action='append',help="Additional compiler arguments (will be unescaped)")
+
 
 	# Used for compiling .cu files (ppcg output), linking (--target=cuda)
 	# Is disabled by --no-cc as well
-	parser.add_argument('--nvcc-prog',help="Path to nvcc compiler executable (default: " + defaultcfg.nvcc_prog + ")")
-	parser.add_argument('--nvcc-arg', '-Xnvcc', action='append',help="Additional nvcc argument (passed literally)")
+	parser.add_argument('--nvcc-prog',metavar='NVCC', help="Path to nvcc compiler executable (default: " + defaultcfg.nvcc_prog + ")")
+	parser.add_argument('--nvcc-arg', action='append',help="Additional nvcc argument (passed literally)")
 	parser.add_argument('--nvcc-args', action='append',help="Additional nvcc arguments (will be unescaped)")
 
-	#parser.add_argument('--ld',dest='ld',action='store_true')
-	#parser.add_argument('--no-ld', dest='ld', action='store_false')
-	#parser.add_argument('--ld-prog')
-	#parser.add_argument('--ld-flag', '-Xlinker', action='append')
-	#parser.add_argument('--ld-flags', action='append')
+	# Used for lingking (and compiling non-pencil files) with --target=cuda
+	parser.add_argument('--nvcc-ld-prog', metavar='NVCCLD')
+	parser.add_argument('--nvcc-ld-arg', action='append')
+	parser.add_argument('--nvcc-ld-args', action='append')
+
+	# Usid for  lingking (and compiling non-pencil files) with --target=prl/opencl
+	parser.add_argument('--cc-ld-prog', metavar='CCLD')
+	parser.add_argument('--cc-ld-arg', action='append')
+	parser.add_argument('--cc-ld-args', action='append')
 
 	parser.add_argument('--autorpath', action='store_true', help="Set linker rpath to runtime libraries.")
 	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action=AppendAction, default=defaultcfg.pencil_ext,
@@ -461,7 +476,7 @@ def parsecmd(defaultcfg, is_tool):
 
 	if is_tool:
 		parser.add_argument('tool', metavar='TOOL')
-		parser.add_argument('tool_args', nargs=argparse.REMAINDER)
+		parser.add_argument('unknown', nargs=argparse.REMAINDER)
 	else:
 		add_captured_cc_args(defaultcfg, parser)
 
@@ -474,13 +489,13 @@ def parsecmd(defaultcfg, is_tool):
 		else:
 			parser = argparse.ArgumentParser(prog=known.tool, add_help=False)
 		add_captured_cc_args(defaultcfg, parser)
-		tool_known, tool_unkown = parser.parse_known_args(known.tool_args)
+		tool_known, tool_unkown = parser.parse_known_args(known.unknown)
 		known.cc_prog = known.tool
 		known.D = tool_known.D
 		known.I = tool_known.I
 		known.std = tool_known.std
 		known.o = tool_known.o
-		known.tool_args = tool_unkown
+		known.unknown = tool_unkown
 		known.ppcg_args = unknown
 
 		# Just dummy properties, they are parsed as 'unknown'
@@ -496,7 +511,7 @@ def parsecmd(defaultcfg, is_tool):
 		known.schedule_maximize_coincidence = None
 		known.pet_autodetect = None
 	else:
-		known.tool_args = unknown
+		known.unknown = unknown
 
 	return known, parser
 
@@ -509,32 +524,45 @@ def error_exit(msg):
 def get_config_from_argparse(known):
 	config = Configuration()
 
-	if known.cpp is not None:
-		config.cpp_disabled = not known.cpp
-	#if known.cpp_prog is not None:
-	#	config.cpp_prog = known.cpp_prog
 	if known.verbose is not None:
 		config.cpp_verbose = max(0, known.verbose - 1)
+		config.ppcg_verbose = max(0, known.verbose - 1)
+		config.cc_verbose = max(0, known.verbose - 1)
+		config.nvcc_verbose = max(0, known.verbose - 1)
+		config.ccld_verbose = max(0, known.verbose - 1)
+		config.nvccld_verbose = max(0, known.verbose - 1)
+
+	if known.cpp is not None:
+		config.cpp_disabled = not known.cpp
+	if known.cpp_prog is not None:
+		config.cpp_prog = known.cpp_prog
 
 	if known.ppcg is not None:
 		config.ppcg_disabled = not known.ppcg
 	if known.ppcg_prog is not None:
 		config.ppcg_prog = known.ppcg_prog
-	if known.verbose is not None:
-		config.ppcg_verbose = max(0, known.verbose - 1)
+
+	if known.tool_prog is not None:
+		config.cpp_prog = known.tool_prog
+		config.cc_prog = known.tool_prog
+		config.nvcc_proc = known.tool_prog
+		config.ccld_prog = known.tool_prog
+		config.nvccld_prog = known.tool_prog
 
 	if known.cc is not None:
 		config.cc_disabled = not known.cc
 	if known.cc_prog is not None:
 		config.cc_prog = known.cc_prog
-	if known.verbose is not None:
-		config.cc_verbose = max(0, known.verbose - 1)
 	config.cc_isgnu = None # Unknown; will test later
 
 	if known.nvcc_prog is not None:
 	   config.nvcc_prof = known.nvcc_prog
-	if known.verbose is not None:
-		config.nvcc_verbose = max(0, known.verbose - 1)
+
+	if known.cc_ld_prog is not None:
+		config.ccld_prog = known.cc_ld_prog
+
+	if known.nvcc_ld_prog is not None:
+		config.nvccld_prog = known.nvcc_ld_prog
 
 	if known.run is not None:
 		config.run_enabled = known.run
@@ -564,6 +592,8 @@ def get_config_from_argparse(known):
 	config.cc_flags = []
 	config.nvcc_flags = []
 	config.opt_flags = []
+	config.ccld_flags = []
+	config.nvccld_flags = []
 
 	for incfile in known.opencl_include_file:
 		config.ppcg_flags += ['--opencl-include-file=' + incfile]
@@ -619,6 +649,27 @@ def get_config_from_argparse(known):
 		config.nvcc_flags += [s for args in known.nvcc_args for s in shlex.split(args)]
 	if known.nvcc_arg is not None:
 		config.nvcc_flags += known.nvcc_arg
+
+	if known.cc_ld_args is not None:
+		config.ccld_flags += [s for args in known.cc_ld_args for s in shlex.split(args)]
+	if known.cc_ld_arg is not None:
+		config.ccld_flags += known.ccld_arg
+
+	if known.nvcc_ld_args is not None:
+		config.nvccld_flags += [s for args in known.nvcc_ld_args for s in shlex.split(args)]
+	if known.nvcc_ld_arg is not None:
+		config.nvccld_flags += known.nvccld_arg
+
+	tool_flags = []
+	if known.tool_args is not None:
+		tool_flags += [s for args in known.tool_args for s in shlex.split(args)]
+	if known.tool_arg is not None:
+		tool_flags += known.tool_arg
+	config.cpp_flags += tool_flags
+	config.cc_flags += tool_flags
+	config.nvcc_flags += tool_flags
+	config.ccld_flags += tool_flags
+	config.nvccld_flags += tool_flags
 
 	if known.run_args is not None:
 		config.run_flags += [s for args in known.run_args for s in shlex.split(args)]
@@ -717,7 +768,7 @@ def common_cc_args(args, isc, ispencil):
 
 
 # These are flags for the compiler driver which passes flags to the linker
-def common_cc_ld_args():
+def common_ld_args():
 	global config
 	ldflags = []
 
@@ -888,7 +939,7 @@ def assemble_cc_ld_args(args, outfile):
 	global config
 
 	ldargs = []
-	ldargs += verbosity(config.ld_verbose)
+	ldargs += verbosity(config.ccld_verbose)
 
 	ldargs += get_std_arg(isc=False, ispencil=False)
 	ldargs += common_cc_args(args=[],isc=False,ispencil=False)
@@ -900,7 +951,8 @@ def assemble_cc_ld_args(args, outfile):
 			else:
 				ldargs += arg.latest_objects()
 
-	ldargs += common_cc_ld_args()
+	ldargs += common_ld_args()
+	ldargs += config.ccld_flags
 
 	if outfile is not None:
 		ldargs += ['-o', outfile]
@@ -911,14 +963,14 @@ def exec_cc_ld(args,outfile,moreargs):
 	ldargs = assemble_cc_ld_args(args=args, outfile=outfile)
 	if moreargs is not None:
 		ldargs += moreargs
-	invoke(config.cc_prog, *ldargs)
+	invoke(config.ccld_prog, *ldargs)
 
 
 def assemble_nvcc_ld_args(args, outfile):
 	global config
 
 	nvccargs = []
-	nvccargs += verbosity(config.nvcc_verbose)
+	nvccargs += verbosity(config.nvccld_verbose)
 
 	std = get_std_arg(isc=False, ispencil=False)
 	if std:
@@ -939,10 +991,10 @@ def assemble_nvcc_ld_args(args, outfile):
 				toolargs += arg.latest_objects()
 		nvccargs += toolargs
 
-	ldargs = common_cc_ld_args()
+	ldargs = common_ld_args()
 	nvccargs += ldargs	# FIXME: There seems to be a way to pass arguments to gcc when linking
 
-	nvccargs += config.nvcc_flags
+	nvccargs += config.nvccld_flags
 
 	if outfile is not None:
 		nvccargs += ['-o', outfile]
@@ -951,7 +1003,7 @@ def assemble_nvcc_ld_args(args, outfile):
 def exec_nvcc_ld(args,outfile):
 	global config
 	nvccargs = assemble_nvcc_ld_args(args=args,outfile=outfile)
-	invoke(config.nvcc_prog, *nvccargs)
+	invoke(config.nvccld_prog, *nvccargs)
 
 
 def cpp_file(filearg, outfile,args):
@@ -959,7 +1011,7 @@ def cpp_file(filearg, outfile,args):
 	if config.cpp_disabled:
 		return
 
-	exec_cpp(infile=filearg.input_file, outfile=outfile, isc=filearg.isc, ispencil=filearg.ispencil,args=args)
+	exec_cpp(infile=filearg.input_file, outfile=outfile, isc=filearg.isc, ispencil=filearg. ispencil, args=args)
 
 	if outfile is None:
 		outfile = changeext(outfile,'.i')
@@ -1113,7 +1165,7 @@ def launch(prog):
 	if config.autorpath:
 		invoke(prog, *config.run_flags)
 	else:
-		ldargs = common_cc_ld_args()
+		ldargs = common_ld_args()
 		ldlibrary = extract_library_paths(ldargs)
 		invoke(prog, *config.run_flags, appendenv={'LD_LIBRARY_PATH': ldlibrary})
 
@@ -1291,7 +1343,7 @@ def process(is_tool):
 	file_args = []
 	n_files = 0
 	prev_is_l = False
-	for arg in known.tool_args:
+	for arg in known.unknown:
 		if prev_is_l:
 			file_args += [CCArg(arg, False)]
 			prev_is_l = False
@@ -1384,6 +1436,8 @@ def compile(args, tmpdir, output, use_subdirs):
 	global config
 
 	file_args = [arg for arg in args if not arg.is_arg()]
+	flag_args = [arg for arg in args if arg.is_arg()]
+
 	stop_after_cpp  = not config.run_enabled and config.ld_disabled and config.cc_disabled and config.ppcg_disabled
 	stop_after_ppcg = not config.run_enabled and config.ld_disabled and config.cc_disabled
 	stop_after_cc   = not config.run_enabled and config.ld_disabled
@@ -1404,7 +1458,7 @@ def compile(args, tmpdir, output, use_subdirs):
 			continue
 
 		ifile = mktempwd(stop_after_cpp, output, tmpdir, 'cpp', changeext(filearg.input_file, '.i'), use_subdirs)
-		cpp_file(filearg=filearg, outfile=ifile, args=file_args)
+		cpp_file(filearg=filearg, outfile=ifile, args=flag_args)
 		if stop_after_cpp:
 			continue
 

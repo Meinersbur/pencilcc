@@ -40,7 +40,9 @@ TESTS = \
 	tests/check-multifile-prl.sh \
 	tests/check-multifile-cuda.sh \
 	tests/check-multilink-prl.sh \
-	tests/check-multilink-cuda.sh
+	tests/check-multilink-cuda.sh \
+	tests/check-cxx-prl.sh \
+	tests/check-cxx-cuda.sh
 
 EXTRA_DIST = \
 	autogen.sh \
@@ -77,7 +79,9 @@ EXTRA_DIST = \
 	tests/check-multifile-prl.sh \
 	tests/check-multifile-cuda.sh \
 	tests/check-multilink-prl.sh \
-	tests/check-multilink-cuda.sh
+	tests/check-multilink-cuda.sh \
+	tests/check-cxx-prl.sh \
+	tests/check-cxx-cuda.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
