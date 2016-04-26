@@ -310,7 +310,7 @@ def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False,stdout=
 	if not showonly:
 		rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env,stdout=stdout,stderr=stderr)
 		if rtncode!=0:
-			exit(rtncode)
+			err_exit("pencilcc: Subcommand failed")
 
 
 def verbosity(lvl):
