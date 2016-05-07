@@ -190,6 +190,7 @@ class Configuration:
 		self.ppcg_verbose = 0
 
 		self.pencil_h_cppflags = []
+		self.pencil_include_dir = os.path.join(prefix, 'include')
 
 		self.ocl_utilities_cppflags = []
 		self.ocl_utilities_cflags =  [os.path.join(datadir,'ppcg','ocl_utilities.c')]
@@ -290,7 +291,7 @@ def print_command(cmd, *args,cwd=None,addenv=None,appendenv=None,force=False,pre
 			print(prefix + '(cd ' + shlex.quote(cwd) + ' && ' + setenv + shortcmd + ' ' + ' '.join([shlex.quote(s) for s in args]) + ')',file=sys.stderr)
 
 
-def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False,stdout=None,stderr=None):
+def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False,stdout=None,stderr=None,silent_fail=False):
 	print_command(cmd, *args,cwd=cwd,addenv=addenv,appendenv=appendenv)
 	env=None
 	if addenv is not None or appendenv is not None:
@@ -310,7 +311,9 @@ def invoke(cmd, *args,cwd=None,addenv=None,appendenv=None,showonly=False,stdout=
 	if not showonly:
 		rtncode = subprocess.call([cmd] + list(args),cwd=cwd,env=env,stdout=stdout,stderr=stderr)
 		if rtncode!=0:
-			err_exit("pencilcc: Subcommand failed")
+			if not silent_fail:
+				print("pencilcc: Subcommand " + cmd + " failed", file=sys.stderr)
+			exit(rtncode)
 
 
 def verbosity(lvl):
@@ -379,7 +382,7 @@ def add_captured_cc_args(defaultcfg, parser):
 
 def parsecmd(defaultcfg, is_tool):
 	if sys.version_info >= (3,5,0):
-		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False, allow_abbrev=False)
+		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False, allow_abbrev=True)
 	else:
 		 # Beware of prefix matching: https://mail.python.org/pipermail/python-dev/2013-November/130601.html http://bugs.python.org/issue14910
 		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False)
@@ -757,6 +760,7 @@ def common_cc_args(args, isc, ispencil):
 		if  config.cc_isgnu:
 			ccflags += ['-Wno-attributes']                    # __attribute__((pencil_access)) not removed by ppcg
 			ccflags += ['-Wno-implicit-function-declaration'] # __pencil_use/def/maybe left in summary functions
+			pass
 
 	for arg in args:
 		if arg.is_arg():
@@ -824,6 +828,8 @@ def assemble_cpp_args(infile, outfile, isc, ispencil, args):
 	for arg in args:
 		if arg.is_arg():
 			cppargs += [arg.arg]
+	if isc or ispencil:
+		cppargs += ['-include', os.path.join(config.pencil_include_dir, 'pencil_cpp.h')]
 
 	if outfile is not None:
 		cppargs += ['-o', outfile]
@@ -857,7 +863,8 @@ def assemble_ppcg_args(infile, outfile, isc, ispencil, force_embed):
 
 	if isc or ispencil:
 		ppcgargs += ['--pet-include=' + os.path.join(config.pencil_include_dir, 'pencil_ppcg.h')]
-		ppcgargs += ['--host-include-file=' + os.path.join(config.pencil_include_dir,'pencil_host_c.h')]
+		ppcgargs += ['--host-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_host_c.h')]
+		ppcgargs += ['--host-append-file=' + os.path.join(config.pencil_include_dir, 'pencil_host_impl.h')]
 		if config.target != 'cuda':
 			ppcgargs += ['--kernel-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_kernel_c.h')]
 			ppcgargs += ['--opencl-include-file=' + os.path.join(config.pencil_include_dir, 'pencil_kernel_cl.h')]
@@ -923,6 +930,13 @@ def assemble_nvcc_cc_args(infile, outfile,args):
 		nvccargs += ['-Xcompiler', flag]
 	nvccargs += config.nvcc_flags
 	nvccargs += ['-D__PENCIL_KERNEL__']
+
+	# Bug workaround CUDA 7.5:
+	# /usr/include/string.h: In function ‘void* __mempcpy_inline(void*, const void*, size_t)’:
+	# /usr/include/string.h:652:42: error: ‘memcpy’ was not declared in this scope
+ 	# return (char *) memcpy (__dest, __src, __n) + __n;
+	#                 ^
+	nvccargs += ['-D_FORCE_INLINES']
 
 	if outfile is not None:
 		nvccargs += ['-o', outfile]
@@ -1171,7 +1185,7 @@ def launch(prog):
 
 
 def is_gnu(cc, tmpdir):
-	ccfilename = os.path.join(tmpdir,'checkgnu.c')
+	ccfilename = os.path.join(tmpdir, 'checkgnu.c')
 	with open(ccfilename, "w") as ccfile:
 		ccfile.write("""
 int main() {
@@ -1183,7 +1197,7 @@ int main() {
 }
 			""")
 	try:
-		invoke(cc, '-std=c99', '-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+		invoke(cc, '-std=c99', '-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=tmpdir)
 	except:
 		return False
 	return True
@@ -1317,7 +1331,7 @@ def process(is_tool):
 		invoke('make', os.path.basename(script),cwd=os.path.dirname(script),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 		cmdline=[sys.argv[0], '--noselfupdate'] + sys.argv[1:]
 		cmdline = [x for x in cmdline if x !=  '--show-invocation'] # Do not show invocation a second time
-		invoke(*cmdline)
+		invoke(*cmdline, silent_fail=True)
 		return
 
 	global config
@@ -1416,7 +1430,10 @@ def has_ext(filename, suffixes):
 
 def mktempwd(islast, outfile, tmpdir, prefix, targetfilename, use_subdir):
 	if islast:
-		return outfile
+		if outfile is None:
+			return targetfilename
+		else:
+			return outfile
 
 	if tmpdir is None:
 		# with --keep and without --keep-dir

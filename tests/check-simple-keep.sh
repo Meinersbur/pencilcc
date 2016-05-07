@@ -7,4 +7,4 @@ echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
-${PENCILCC} -vv -g -O0 --keep --keep-dir "${TESTBUILDDIR}" "${TESTSRCDIR}/simple.c"  --run
+${PENCILCC} -v -v -O3 --keep --keep-dir "${TESTBUILDDIR}" "${TESTSRCDIR}/simple.c"  --run

@@ -7,4 +7,4 @@ echo "TESTSRCDIR=${TESTSRCDIR}"
 echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
-${PENCILCC} -vv -O3 "${TESTSRCDIR}/pencil_npr_tag.c" --run
+${PENCILCC} -v -v -O3 "${TESTSRCDIR}/pencil_npr_tag.c" --run

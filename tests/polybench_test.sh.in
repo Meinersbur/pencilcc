@@ -92,4 +92,4 @@ run_tests () {
 	done
 }
 
-run_tests ppcg_prl "--target=prl" "-g -O0 -I${PRL_INCLUDE_DIR}/include -L${PRL_BUILDDIR}/src/.libs -lprl_opencl -lOpenCL -lm"
+run_tests ppcg_prl "--target=prl" "-O3 -I${PRL_INCLUDE_DIR}/include -L${PRL_BUILDDIR}/src/.libs -lprl_opencl -lOpenCL -lm"
