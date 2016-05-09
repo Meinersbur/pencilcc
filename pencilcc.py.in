@@ -370,7 +370,8 @@ def add_captured_cc_args(defaultcfg, parser):
 	parser.add_argument('-I', action='append', default=[], help=argparse.SUPPRESS)
 
 	# Optimization arguments also passed to nvcc/cc of the _kernel file
-	parser.add_argument('-g', nargs='?', const='', help=argparse.SUPPRESS)
+	# TODO: These optionally have a number argument, doesn't seem possible to account for using argparse.
+	parser.add_argument('-g', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('-O', nargs='?', const='', help=argparse.SUPPRESS)
 
 	# Compatibility arguments; required so the file name argument is not interpreted as input file
@@ -380,7 +381,30 @@ def add_captured_cc_args(defaultcfg, parser):
 	parser.add_argument('-std', metavar='STD', help="Language dialect (c99, gnu99)")
 
 
+ppcg_options = set()
+
+def ppcg_bool_option(parser, option):
+	global ppcg_options
+	dest = option.replace('-', '_')
+	ppcg_options.add(dest)
+	parser.add_argument('--'    + option, dest=dest, action='store_true',  default=None, help=argparse.SUPPRESS)
+	parser.add_argument('--no-' + option, dest=dest, action='store_false', default=None, help=argparse.SUPPRESS)
+
+def ppcg_option(parser, option):
+	global ppcg_options
+	dest = option.replace('-', '_')
+	ppcg_options.add(dest)
+	parser.add_argument('--' + option, dest=dest, default=None, help=argparse.SUPPRESS)
+
+def ppcg_list_option(parser, option):
+	global ppcg_options
+	dest = option.replace('-', '_')
+	ppcg_options.add(dest)
+	parser.add_argument('--' + option, dest=dest, action='append', default=[], help=argparse.SUPPRESS)
+
 def parsecmd(defaultcfg, is_tool):
+	global ppcg_options
+
 	if sys.version_info >= (3,5,0):
 		parser = argparse.ArgumentParser(description="Driver for PENCIL.  Executes pencil-optimizer, ppcg and compiler as required.", add_help=False, allow_abbrev=True)
 	else:
@@ -463,19 +487,82 @@ def parsecmd(defaultcfg, is_tool):
 	# Passed to PPCG only
 	parser.add_argument('--target', choices=['prl', 'opencl', 'cuda'], default='prl', help="Generate code for (default: prl)")
 	if not is_tool:
-		parser.add_argument('--opencl-include-file', metavar='HEADER', action='append', default=[], help=argparse.SUPPRESS)
-		parser.add_argument('--no-isl-schedule-separate-components', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--isl-schedule-max-coefficient', metavar='CEOFF', help=argparse.SUPPRESS)
-		parser.add_argument('--no-shared-memory', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--no-private-memory', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--sizes', metavar='SIZES', help=argparse.SUPPRESS)
-		parser.add_argument('--dump-sizes', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--no-opencl-print-kernel-types', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--no-schedule-whole-component', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--schedule-maximize-coincidence', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--pet-autodetect', action='store_true', help=argparse.SUPPRESS)
-		parser.add_argument('--opencl-embed-kernel-code', action='store_false', dest='opencl_embed_kernel_code',  help=argparse.SUPPRESS)
-		parser.add_argument('--no-opencl-embed-kernel-code', action='store_true', dest='opencl_embed_kernel_code', help=argparse.SUPPRESS)
+		#ppcg_bool_option(parser, '')
+		ppcg_bool_option(parser, 'pet-autodetect')
+		ppcg_bool_option(parser, 'pet-detect-conditional-assignment')
+		ppcg_bool_option(parser, 'pet-pencil')
+		ppcg_option(parser, 'pet-signed-overflow')
+		ppcg_list_option(parser, 'pet-include-file')
+
+		ppcg_bool_option(parser, 'group-chains')
+		ppcg_bool_option(parser, 'reschedule')
+		ppcg_bool_option(parser, 'scale-tile-loops')
+		ppcg_bool_option(parser, 'wrap')
+		ppcg_bool_option(parser, 'shared-memory')
+		ppcg_bool_option(parser, 'private-memory')
+		ppcg_option(parser, 'ctx')
+		ppcg_bool_option(parser, 'assume-non-negative-parameters')
+		ppcg_bool_option(parser, 'tile')
+
+		parser.add_argument('--tile-size', '-S', dest='tile_size', default=None, help=argparse.SUPPRESS)
+		ppcg_options.add('tile_size')
+		ppcg_option(parser, 'sizes')
+
+		ppcg_option(parser, 'max-shared-memory')
+		ppcg_bool_option(parser, 'openmp')
+		ppcg_bool_option(parser, 'allow-gnu-extensions')
+		ppcg_bool_option(parser, 'live-range-reordering')
+		ppcg_option(parser, 'load-schedule')
+		ppcg_option(parser, 'save-schedule')
+
+		ppcg_option(parser, 'isl-context')
+		ppcg_option(parser, 'isl-gbr')
+		ppcg_option(parser, 'isl-closure')
+		ppcg_bool_option(parser, 'isl-gbr-only-first')
+		ppcg_option(parser, 'isl-bound')
+		ppcg_option(parser, 'isl-on-error')
+		ppcg_option(parser, 'isl-bernstein')
+		ppcg_option(parser, 'isl-bernstein-recurse')
+		ppcg_bool_option(parser, 'isl-bernstein-triangulate')
+		ppcg_bool_option(parser, 'isl-pip-symmetry')
+		ppcg_option(parser, 'isl-convex-hull')
+		ppcg_bool_option(parser, 'isl-coalesce-bounded-wrapping')
+		ppcg_option(parser, 'isl-schedule-max-coefficient')
+		ppcg_option(parser, 'isl-schedule-max-constant-term')
+		ppcg_bool_option(parser, 'isl-schedule-parametric')
+		ppcg_bool_option(parser, 'isl-schedule-outer-coincidence')
+		ppcg_bool_option(parser, 'isl-schedule-maximize-band-depth')
+		ppcg_bool_option(parser, 'isl-schedule-maximize-coincidence')
+		ppcg_bool_option(parser, 'isl-schedule-split-scaled')
+		ppcg_bool_option(parser, 'isl-schedule-treat-coalescing')
+		ppcg_bool_option(parser, 'isl-schedule-separate-components')
+		ppcg_bool_option(parser, 'isl-schedule-whole-component')
+		ppcg_option(parser, 'isl-schedule-algorithm')
+		ppcg_bool_option(parser, 'isl-tile-scale-tile-loops')
+		ppcg_bool_option(parser, 'isl-tile-shift-point-loops')
+		ppcg_option(parser, 'isl-ast-iterator-type')
+		ppcg_bool_option(parser, 'ast-always-print-block')
+		ppcg_bool_option(parser, 'isl-ast-print-macro-once')
+		ppcg_bool_option(parser, 'isl-ast-build-atomic-upper-bound')
+		ppcg_bool_option(parser, 'isl-ast-build-prefer-pdiv')
+		ppcg_bool_option(parser, 'isl-ast-build-detect-min-max')
+		ppcg_bool_option(parser, 'isl-ast-build-exploit-nested-bounds')
+		ppcg_bool_option(parser, 'isl-ast-build-group-coscheduled')
+		ppcg_option(parser, 'isl-ast-build-separation-bounds')
+		ppcg_bool_option(parser, 'isl-ast-build-scale-strides')
+		ppcg_bool_option(parser, 'isl-ast-build-allow-else')
+		ppcg_bool_option(parser, 'isl-ast-build-allow-or')
+		ppcg_bool_option(parser, 'isl-print-stats')
+		ppcg_option(parser, 'isl-max-operations')
+		ppcg_bool_option(parser, 'dump-schedule-constraints')
+		ppcg_bool_option(parser, 'dump-schedule')
+		ppcg_bool_option(parser, 'dump-final-schedule')
+		ppcg_bool_option(parser, 'dump-sizes')
+		ppcg_option(parser, 'opencl-compiler-options')
+		ppcg_list_option(parser, 'opencl-include-file')
+		ppcg_bool_option(parser, 'opencl-print-kernel-types')
+		ppcg_bool_option(parser, 'opencl-embed-kernel-code')
+
 
 	if is_tool:
 		parser.add_argument('tool', metavar='TOOL')
@@ -500,19 +587,6 @@ def parsecmd(defaultcfg, is_tool):
 		known.o = tool_known.o
 		known.unknown = tool_unkown
 		known.ppcg_args = unknown
-
-		# Just dummy properties, they are parsed as 'unknown'
-		known.opencl_include_file = []
-		known.no_isl_schedule_separate_components = None
-		known.isl_schedule_max_coefficient = None
-		known.no_shared_memory = None
-		known.no_private_memory = None
-		known.sizes = None
-		known.dump_sizes = None
-		known.no_opencl_print_kernel_types = None
-		known.no_schedule_whole_component = None
-		known.schedule_maximize_coincidence = None
-		known.pet_autodetect = None
 	else:
 		known.unknown = unknown
 
@@ -598,37 +672,33 @@ def get_config_from_argparse(known):
 	config.ccld_flags = []
 	config.nvccld_flags = []
 
-	for incfile in known.opencl_include_file:
-		config.ppcg_flags += ['--opencl-include-file=' + incfile]
-	if known.no_isl_schedule_separate_components:
-		config.ppcg_flags += ['--no-isl-schedule-separate-components']
-	if not known.isl_schedule_max_coefficient is None:
-		config.ppcg_flags += ['--isl-schedule-max-coefficient=' + known.isl_schedule_max_coefficient]
-	if known.no_shared_memory:
-		config.ppcg_flags += ['--no-shared-memory']
-	if known.no_private_memory:
-		config.ppcg_flags += ['--no-private-memory']
-	if known.sizes is not None:
-		config.ppcg_flags += ['--sizes=' + known.sizes]
-	if known.dump_sizes:
-		config.ppcg_flags += ['--dump-sizes']
-	if known.no_opencl_print_kernel_types:
-		config.ppcg_flags += ['--no-opencl-print-kernel-types']
-	if known.no_schedule_whole_component:
-		config.ppcg_flags += ['--no-schedule-whole-component']
-	if known.schedule_maximize_coincidence:
-		config.ppcg_flags += ['--schedule-maximize-coincidence']
-	if known.opencl_embed_kernel_code is not None:
-		config.opencl_embed_kernel_code = known.opencl_embed_kernel_code
+	global ppcg_options
+	for opt in ppcg_options:
+		optname = opt.replace('_', '-')
+		val = getattr(known, opt, None)
+		if val is None:
+			pass
+		elif val is True:
+			config.ppcg_flags += ['--' + optname]
+		elif val is False:
+			config.ppcg_flags += ['--no-' + optname]
+		elif isinstance(val, list):
+			for valelt in val:
+				config.ppcg_flags += ['--' + optname + '=' + valelt]
+		else:
+			config.ppcg_flags += ['--' + optname + '=' + val]
 
 	for flag in known.D:
 		config.cpp_flags += ['-D' + flag]
 	for i in known.I:
 		config.cpp_flags += ['-I', i]
 	if known.O is not None:
-		config.opt_flags += ['-O' + known.O]
+		try:
+			config.opt_flags += ['-O' + known.O]
+		except:
+			config.opt_flags += ['-O']
 	if known.g is not None:
-		config.opt_flags += ['-g' + known.g]
+		config.opt_flags += ['-g']
 
 	if known.std is not None:
 		config.std = known.std
