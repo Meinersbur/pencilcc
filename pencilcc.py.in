@@ -469,9 +469,9 @@ def parsecmd(defaultcfg, is_tool):
 	parser.add_argument('--cc-ld-args', action='append')
 
 	parser.add_argument('--autorpath', action='store_true', help="Set linker rpath to runtime libraries.")
-	parser.add_argument('--pencil-ext', metavar='SUFFIXES', action=AppendAction, default=defaultcfg.pencil_ext,
+	parser.add_argument('--pencil-ext', metavar='SUFFIX', action=AppendAction, default=defaultcfg.pencil_ext,
 		help="File extentions for forcing --pet-autodetect (default: .pencil.c,.pencil)")
-	parser.add_argument('--c-ext', metavar='SUFFIXES', action=AppendAction, default=defaultcfg.c_ext,
+	parser.add_argument('--c-ext', metavar='SUFFIX', action=AppendAction, default=defaultcfg.c_ext,
 		help="File extensions that are to be processed by ppcg (implicitely includes all --pencil-ext)")
 
 	# Action control
@@ -559,6 +559,7 @@ def parsecmd(defaultcfg, is_tool):
 		ppcg_bool_option(parser, 'dump-final-schedule')
 		ppcg_bool_option(parser, 'dump-sizes')
 		ppcg_option(parser, 'opencl-compiler-options')
+		ppcg_bool_option(parser, 'opencl-use-gpu')
 		ppcg_list_option(parser, 'opencl-include-file')
 		ppcg_bool_option(parser, 'opencl-print-kernel-types')
 		ppcg_bool_option(parser, 'opencl-embed-kernel-code')
