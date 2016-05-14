@@ -10,7 +10,7 @@ cd "${TESTBUILDDIR}"
 
 
 cat > external.cl <<- EOM
-void external(int n, float *A, int i) {
+void external(int n, __global float *A, int i) {
 	A[i] = 42;
 }
 EOM
