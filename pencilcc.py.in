@@ -870,18 +870,11 @@ def get_std_arg(isc, ispencil):
 	if not config.cc_isgnu:
 		return []
 
-	if isc or ispencil:
-		# Use the user-specified C-dialect, gnu99 is default
-		std = 'gnu99'
-		if config.std in {'c89', 'c90', 'c99', 'c9x', 'iso9899:1990', 'iso9899:199409', 'c11', 'c1x', 'iso9899:2011', 'gnu98', 'gnu90', 'gnu9x', 'gnu99', 'gnu11', 'gnu1x'}:
-			std = config.std
-		return ['-std=' + std]
-	else:
-		# Use the user-specified one, even if C++
-		if config.std is None:
-			return []
-		else:
-			return ['-std=' + config.std]
+	# Use the user-specified C-dialect, gnu99 is default
+	std = 'gnu99'
+	if config.std in {'c89', 'c90', 'c99', 'c9x', 'iso9899:1990', 'iso9899:199409', 'c11', 'c1x', 'iso9899:2011', 'gnu98', 'gnu90', 'gnu9x', 'gnu99', 'gnu11', 'gnu1x'}:
+		std = config.std
+	return ['-std=' + std]
 
 
 def assemble_cpp_args(infile, outfile, isc, ispencil, args):
@@ -1268,7 +1261,7 @@ int main() {
 }
 			""")
 	try:
-		invoke(cc, '-std=c99', '-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=tmpdir)
+		invoke(cc, '-std=gnu99', '-Wno-attributes', ccfilename, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=tmpdir)
 	except:
 		return False
 	return True
