@@ -45,7 +45,8 @@ TESTS = \
 	tests/check-cxx-cuda.sh \
 	tests/check-math-prl.sh \
 	tests/check-math-cuda.sh \
-	tests/check-summary.sh
+	tests/check-summary.sh \
+	tests/check-benchmark-prl.sh
 
 EXTRA_DIST = \
 	autogen.sh \
@@ -87,7 +88,8 @@ EXTRA_DIST = \
 	tests/check-cxx-cuda.sh \
 	tests/check-math-prl.sh \
 	tests/check-math-cuda.sh \
-	tests/check-summary.sh
+	tests/check-summary.sh \
+	tests/check-benchmark-prl.sh
 
 AM_TESTS_ENVIRONMENT = \
 	export PENCILCC="$(abs_builddir)/pencilcc"; \
