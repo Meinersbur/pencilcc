@@ -16,7 +16,7 @@ void external(int n, __global float *A, int i) {
 EOM
 
 
-cat > summary.pencil.c <<- EOM
+cat > summary_pencil.c <<- EOM
 #include <pencil.h>
 #include <stdio.h>
 
@@ -27,8 +27,10 @@ PENCIL_SUMMARY_FUNC void external_summary(int n, float A[PENCIL_ARRAY n], int i)
 void external(int n, float A[PENCIL_ARRAY n], int i) PENCIL_ACCESS(external_summary);
 
 void kernel(int n, float A[PENCIL_ARRAY n]) {
+#pragma scop
 	for (int i = 0; i<n; ++i)
 		external(n, A, i);
+#pragma endscop
 }
 
 int main() {
@@ -47,4 +49,4 @@ int main() {
 EOM
 
 
-${PENCILCC} -v -v -O3 -w  summary.pencil.c --opencl-include-file="${TESTBUILDDIR}/external.cl" --run
+${PENCILCC} -v -v -O3 -w  summary_pencil.c --target-fallback=error --opencl-include-file="${TESTBUILDDIR}/external.cl" --run

@@ -509,6 +509,7 @@ def parsecmd(defaultcfg, is_tool):
 		ppcg_option(parser, 'sizes')
 
 		ppcg_option(parser, 'max-shared-memory')
+		ppcg_option(parser, 'target-fallback')
 		ppcg_bool_option(parser, 'openmp')
 		ppcg_bool_option(parser, 'allow-gnu-extensions')
 		ppcg_bool_option(parser, 'live-range-reordering')

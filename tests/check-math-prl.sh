@@ -8,10 +8,11 @@ echo "TESTBUILDDIR=${TESTBUILDDIR}"
 
 cd "${TESTBUILDDIR}"
 
-cat > math.pencil.c <<- EOM
+cat > math_pencil.c <<- EOM
 #include <pencil.h>
 
 void kernel(int n, int32_t A32[static const restrict n], int64_t A64[static const restrict n], double fA[static const restrict n], float fAf[static const restrict n]) {
+#pragma scop
 	for (int32_t i = 0; i<n; ++i) {
 		A32[i] = i;
 		A64[i] = i;
@@ -34,6 +35,7 @@ void kernel(int n, int32_t A32[static const restrict n], int64_t A64[static cons
 		fA[i] = atan2pi(fA[i], fA[i]);
 		fAf[i] = atan2pif(fAf[i], fAf[i]);
 	}
+#pragma endscop
 }
 
 int main() {
@@ -46,4 +48,4 @@ int main() {
 }
 EOM
 
-${PENCILCC} -v -v -O3 --target=prl -w  math.pencil.c --run
+${PENCILCC} -v -v -O3 --target=prl -w  math_pencil.c --run

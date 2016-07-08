@@ -32,6 +32,7 @@ void gen_waves(int count, int m, int n, float out[static const restrict count][m
 
 void convolution(int count, int m, int n, float in[static const restrict count][m][n], int w, int h, float filter[static const restrict w][h], float out[static const restrict count][m][n]) {
 #pragma scop
+	__pencil_kill(out);
 	for (int i = 0; i < count; i += 1)
 		for (int x = w/2; x < m-(w-1)/2; x += 1)
 			for (int y = h/2; y < n-(h-1)/2; y += 1) {
