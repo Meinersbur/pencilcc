@@ -61,4 +61,4 @@ int main() {
 }
 EOM
 
-${PENCILCC} -v -v -O0 -g fill.c -o fill --run
+PRL_TRACE_GPU=1 ${PENCILCC} -v -v -O0 -g fill.c -o fill --run
