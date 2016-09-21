@@ -49,6 +49,6 @@ int main() {
 
 EOM
 
-${PENCILCC} -v -v -O3 --target=prl -w benchmark.c -o benchmark
+${PENCILCC} -v -v -O3 --target=prl -w benchmark.c -o benchmark --autorpath
 PRL_PROF_ALL=1 PRL_PROF_PREFIX=PROF_ ./benchmark | tee std.out
 grep "^PROF\_Duration\s*\:\s*[0-9\.]+\s*ms\s\(\S+\s*[0-9\.]+\%\)$" -P std.out

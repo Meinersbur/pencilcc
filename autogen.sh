@@ -1,3 +1,4 @@
 #! /bin/sh
 
-autoreconf -i
+ACLOCAL_PATH=${ACLOCAL_PATH}:/usr/share/aclocal autoreconf -i
+
