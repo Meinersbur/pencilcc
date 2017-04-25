@@ -25,7 +25,8 @@ static void kernel(int n, uint32_t A[static const restrict n], uint32_t val) {
 
 static void expect(int n, uint32_t A[static const restrict n], uint32_t val) {
 	for (int i = 0; i<n; ++i)
-		printf("A[%d]=%u (expected %u)\n", i, A[i], val);
+		if (A[i] != val)
+	  	printf("A[%d]=%u (expected %u)\n", i, A[i], val);
 
 	for (int i = 0; i<n; ++i)
 		assert(A[i] == val);
@@ -60,4 +61,4 @@ int main() {
 }
 EOM
 
-PRL_TRACE_ALL=1 ${PENCILCC} -v -v -O0 -g fill.c -o fill --run --keep --autorpath
+PRL_TRACE_GPU=1 ${PENCILCC} -v -v -O0 -g fill.c -o fill --run
