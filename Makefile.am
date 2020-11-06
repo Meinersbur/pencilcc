@@ -115,7 +115,7 @@ uninstall-local:
 	rm -f $(DESTDIR)$(bindir)/pencilcc
 	rm -f $(DESTDIR)$(bindir)/penciltool
 
-# Dowload from the internet
+# Download from the internet
 polybench: get-polybench.sh
 	${srcdir}/get-polybench.sh
 
